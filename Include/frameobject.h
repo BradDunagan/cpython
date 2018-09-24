@@ -14,6 +14,18 @@ typedef struct {
     int b_level;                /* value stack level to pop to */
 } PyTryBlock;
 
+#define	BRADDS_F_FLAGS_NO_STACK			0x00000001
+#define BRADDS_F_FLAGS_FIRST_INSTR		0x00000002
+#define	BRADDS_F_FLAGS_RETURN			0x00000004
+#define	BRADDS_F_FLAGS_NEW_FRAME		0x00000008
+/* The idea of this "native call" flag is that it is set when a call is 
+   made that does not create a  new frame.  When it is not set upon a return 
+   then we know we need to clean things up and prepare to switch back to 
+   the calling frame. */
+#define BRADDS_F_FLAGS_NATIVE_CALL		0x00000010
+#define BRADDS_F_FLAGS_JUMP_OFF_FOR		0x00000020
+#define BRADDS_F_FLAGS_CREATE_RECORD	0x00000040
+
 typedef struct _frame {
     PyObject_VAR_HEAD
     struct _frame *f_back;      /* previous frame, or NULL */
@@ -43,6 +55,14 @@ typedef struct _frame {
     int f_iblock;               /* index in f_blockstack */
     char f_executing;           /* whether the frame is still executing */
     PyTryBlock f_blockstack[CO_MAXBLOCKS]; /* for try and loop blocks */
+	
+	int bradds_f_flags;			/*	See BRADDS_F_FLAGS_ defines */
+	const _Py_CODEUNIT * bradds_f_next_instr;
+	int					 bradds_f_next_instri;
+	int bradds_f_oparg;			/*	Used after return from another frame */
+//	PyObject **bradds_f_stack_pointer;	/* To maintain during a call */
+//	PyObject * bradds_async_arg;
+
     PyObject *f_localsplus[1];  /* locals+stack, dynamically sized */
 } PyFrameObject;
 

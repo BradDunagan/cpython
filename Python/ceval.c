@@ -53,6 +53,7 @@ static void call_exc_trace(Py_tracefunc, PyObject *,
 static int maybe_call_line_trace(Py_tracefunc, PyObject *,
                                  PyThreadState *, PyFrameObject *,
                                  int *, int *, int *);
+static int bradds_maybe_ ( PyFrameObject * frame, int, int *, int *, int * );
 static void maybe_dtrace_line(PyFrameObject *, int *, int *, int *);
 static void dtrace_function_entry(PyFrameObject *);
 static void dtrace_function_return(PyFrameObject *);
@@ -3498,7 +3499,1034 @@ exit_eval_frame:
     tstate->frame = f->f_back;
 
     return _Py_CheckFunctionResult(NULL, retval, "PyEval_EvalFrameEx");
+
+#undef DISPATCH
+#undef FAST_DISPATCH
 }
+
+int		_BradDs_PyEval_EvalFrameDefault_Init ( PyFrameObject * f,
+											   int * instr_lb,
+											   int * instr_ub,
+											   int * instr_prev ) 
+{
+	*instr_ub = -1;	 *instr_lb = 0;	*instr_prev = -1;
+//	int lasti = f->f_lasti;
+//	f->f_lasti =  0;
+	int rtn = bradds_maybe_ ( f, 0, instr_lb, instr_ub, instr_prev );
+//	f->f_lasti = lasti;
+	return rtn;
+}	//	_BradDs_PyEval_EvalFrameDefault_Init()
+
+PyObject* _Py_HOT_FUNCTION
+_BradDs_PyEval_EvalFrameDefault ( PyFrameObject *f, int throwflag,
+													int * instr_lb,
+													int * instr_ub,
+													int * instr_prev ) 
+{
+    PyObject **stack_pointer;  /* Next free slot in value stack */
+    const _Py_CODEUNIT *next_instr;
+    int opcode;        /* Current opcode */
+    int oparg;         /* Current opcode argument, if any */
+    PyObject **fastlocals, **freevars;
+    PyObject *retval = NULL;            /* Return value */
+    PyThreadState *tstate = PyThreadState_GET();
+    PyCodeObject *co;
+
+	int bradds_returning = 0;
+	int bradds_was_native_call = 0;
+
+    /* when tracing we set things up so that
+
+           not (instr_lb <= current_bytecode_offset < instr_ub)
+
+       is true when the line being executed has changed.  The
+       initial values are such as to make this false the first
+       time it is tested. */
+//	int instr_ub = -1, instr_lb = 0, instr_prev = -1;
+
+    const _Py_CODEUNIT *first_instr;
+    PyObject *names;
+    PyObject *consts;
+
+#ifdef LLTRACE
+    _Py_IDENTIFIER(__ltrace__);
+#endif
+
+
+#undef USE_COMPUTED_GOTOS
+#define USE_COMPUTED_GOTOS 0
+
+#if USE_COMPUTED_GOTOS
+
+#else
+#define TARGET(op) \
+    case op:
+
+/*
+#define DISPATCH() continue
+#define FAST_DISPATCH() goto fast_next_opcode
+*/
+
+/* Tuple access macros */
+
+#ifndef Py_DEBUG
+#define GETITEM(v, i) PyTuple_GET_ITEM((PyTupleObject *)(v), (i))
+#else
+#define GETITEM(v, i) PyTuple_GetItem((v), (i))
+#endif
+
+/* Code access macros */
+
+/* The integer overflow is checked by an assertion below. */
+#define INSTR_OFFSET()  \
+    (sizeof(_Py_CODEUNIT) * (int)(next_instr - first_instr))
+#define NEXTOPARG()  do { \
+        _Py_CODEUNIT word = *next_instr; \
+        opcode = _Py_OPCODE(word); \
+        oparg = _Py_OPARG(word); \
+        next_instr++; \
+    } while (0)
+#define JUMPTO(x)       (next_instr = first_instr + (x) / sizeof(_Py_CODEUNIT))
+#define JUMPBY(x)       (next_instr += (x) / sizeof(_Py_CODEUNIT))
+#define JUMPBACK(x)     (next_instr -= (x) / sizeof(_Py_CODEUNIT))
+
+#define NO_STACK_RETURN()					\
+	f->f_stacktop = stack_pointer;			\
+	f->bradds_f_next_instr = next_instr;	\
+	goto return_or_yield										
+#define DISPATCH()													\
+	if ( bradds_maybe_ ( f, INSTR_OFFSET(),							\
+							instr_lb, instr_ub, instr_prev ) ) {	\
+		retval = Py_None;											\
+		Py_INCREF(retval);											\
+		NO_STACK_RETURN();											\
+	} else															\
+		continue 
+#define FAST_DISPATCH()		DISPATCH()
+#endif
+
+/* OpCode prediction macros */
+
+#if defined(DYNAMIC_EXECUTION_PROFILE) || USE_COMPUTED_GOTOS
+#define PREDICT(op)             if (0) goto PRED_##op
+#else
+#define PREDICT(op) \
+    do{ \
+        _Py_CODEUNIT word = *next_instr; \
+        opcode = _Py_OPCODE(word); \
+        if (opcode == op){ \
+            oparg = _Py_OPARG(word); \
+            next_instr++; \
+            goto PRED_##op; \
+        } \
+    } while(0)
+#endif
+#define PREDICTED(op)           PRED_##op:
+
+/* Stack manipulation macros */
+
+/* The stack can grow at most MAXINT deep, as co_nlocals and
+   co_stacksize are ints. */
+#define STACK_LEVEL()     ((int)(stack_pointer - f->f_valuestack))
+#define EMPTY()           (STACK_LEVEL() == 0)
+#define TOP()             (stack_pointer[-1])
+#define SECOND()          (stack_pointer[-2])
+#define THIRD()           (stack_pointer[-3])
+#define FOURTH()          (stack_pointer[-4])
+#define PEEK(n)           (stack_pointer[-(n)])
+#define SET_TOP(v)        (stack_pointer[-1] = (v))
+#define SET_SECOND(v)     (stack_pointer[-2] = (v))
+#define SET_THIRD(v)      (stack_pointer[-3] = (v))
+#define SET_FOURTH(v)     (stack_pointer[-4] = (v))
+#define SET_VALUE(n, v)   (stack_pointer[-(n)] = (v))
+#define BASIC_STACKADJ(n) (stack_pointer += n)
+#define BASIC_PUSH(v)     (*stack_pointer++ = (v))
+#define BASIC_POP()       (*--stack_pointer)
+
+#ifdef LLTRACE
+#define PUSH(v)         { (void)(BASIC_PUSH(v), \
+                          lltrace && prtrace(TOP(), "push")); \
+                          assert(STACK_LEVEL() <= co->co_stacksize); }
+#define POP()           ((void)(lltrace && prtrace(TOP(), "pop")), \
+                         BASIC_POP())
+#define STACKADJ(n)     { (void)(BASIC_STACKADJ(n), \
+                          lltrace && prtrace(TOP(), "stackadj")); \
+                          assert(STACK_LEVEL() <= co->co_stacksize); }
+#define EXT_POP(STACK_POINTER) ((void)(lltrace && \
+                                prtrace((STACK_POINTER)[-1], "ext_pop")), \
+                                *--(STACK_POINTER))
+#else
+#define PUSH(v)                BASIC_PUSH(v)
+#define POP()                  BASIC_POP()
+#define STACKADJ(n)            BASIC_STACKADJ(n)
+#define EXT_POP(STACK_POINTER) (*--(STACK_POINTER))
+#endif
+
+/* Local variable macros */
+
+#define GETLOCAL(i)     (fastlocals[i])
+
+/* The SETLOCAL() macro must not DECREF the local variable in-place and
+   then store the new value; it must copy the old value to a temporary
+   value, then store the new value, and then DECREF the temporary value.
+   This is because it is possible that during the DECREF the frame is
+   accessed by other code (e.g. a __del__ method or gc.collect()) and the
+   variable would be pointing to already-freed memory. */
+#define SETLOCAL(i, value)      do { PyObject *tmp = GETLOCAL(i); \
+                                     GETLOCAL(i) = value; \
+                                     Py_XDECREF(tmp); } while (0)
+
+
+#define UNWIND_BLOCK(b) \
+    while (STACK_LEVEL() > (b)->b_level) { \
+        PyObject *v = POP(); \
+        Py_XDECREF(v); \
+    }
+
+#define UNWIND_EXCEPT_HANDLER(b) \
+    do { \
+        PyObject *type, *value, *traceback; \
+        _PyErr_StackItem *exc_info; \
+        assert(STACK_LEVEL() >= (b)->b_level + 3); \
+        while (STACK_LEVEL() > (b)->b_level + 3) { \
+            value = POP(); \
+            Py_XDECREF(value); \
+        } \
+        exc_info = tstate->exc_info; \
+        type = exc_info->exc_type; \
+        value = exc_info->exc_value; \
+        traceback = exc_info->exc_traceback; \
+        exc_info->exc_type = POP(); \
+        exc_info->exc_value = POP(); \
+        exc_info->exc_traceback = POP(); \
+        Py_XDECREF(type); \
+        Py_XDECREF(value); \
+        Py_XDECREF(traceback); \
+    } while(0)
+
+/* Start of code */
+
+    /* push frame */
+    if (Py_EnterRecursiveCall(""))
+        return NULL;
+
+    tstate->frame = f;
+
+    if (tstate->use_tracing) {
+        if (tstate->c_tracefunc != NULL) {
+            /* tstate->c_tracefunc, if defined, is a
+               function that will be called on *every* entry
+               to a code block.  Its return value, if not
+               None, is a function that will be called at
+               the start of each executed line of code.
+               (Actually, the function must return itself
+               in order to continue tracing.)  The trace
+               functions are called with three arguments:
+               a pointer to the current frame, a string
+               indicating why the function is called, and
+               an argument which depends on the situation.
+               The global trace function is also called
+               whenever an exception is detected. */
+            if (call_trace_protected(tstate->c_tracefunc,
+                                     tstate->c_traceobj,
+                                     tstate, f, PyTrace_CALL, Py_None)) {
+                /* Trace function raised an error */
+                goto exit_eval_frame;
+            }
+        }
+        if (tstate->c_profilefunc != NULL) {
+            /* Similar for c_profilefunc, except it needn't
+               return itself and isn't called for "line" events */
+            if (call_trace_protected(tstate->c_profilefunc,
+                                     tstate->c_profileobj,
+                                     tstate, f, PyTrace_CALL, Py_None)) {
+                /* Profile function raised an error */
+                goto exit_eval_frame;
+            }
+        }
+    }
+
+    if (PyDTrace_FUNCTION_ENTRY_ENABLED())
+        dtrace_function_entry(f);
+
+    co = f->f_code;
+    names = co->co_names;
+    consts = co->co_consts;
+    fastlocals = f->f_localsplus;
+    freevars = f->f_localsplus + co->co_nlocals;
+    assert(PyBytes_Check(co->co_code));
+    assert(PyBytes_GET_SIZE(co->co_code) <= INT_MAX);
+    assert(PyBytes_GET_SIZE(co->co_code) % sizeof(_Py_CODEUNIT) == 0);
+    assert(_Py_IS_ALIGNED(PyBytes_AS_STRING(co->co_code), sizeof(_Py_CODEUNIT)));
+    first_instr = (_Py_CODEUNIT *) PyBytes_AS_STRING(co->co_code);
+
+    stack_pointer = f->f_stacktop;
+    assert(stack_pointer != NULL);
+    f->f_stacktop = NULL;       /* remains NULL unless yield suspends frame */
+    f->f_executing = 1;
+    /*
+       f->f_lasti refers to the index of the last instruction,
+       unless it's -1 in which case next_instr should be first_instr.
+
+       YIELD_FROM sets f_lasti to itself, in order to repeatedly yield
+       multiple values.
+
+       When the PREDICT() macros are enabled, some opcode pairs follow in
+       direct succession without updating f->f_lasti.  A successful
+       prediction effectively links the two codes together as if they
+       were a single new opcode; accordingly,f->f_lasti will point to
+       the first code in the pair (for instance, GET_ITER followed by
+       FOR_ITER is effectively a single opcode and f->f_lasti will point
+       to the beginning of the combined pair.)
+    */
+    assert(f->f_lasti >= -1);
+	if ( f->bradds_f_flags & BRADDS_F_FLAGS_FIRST_INSTR ) {
+		f->bradds_f_flags &= ~BRADDS_F_FLAGS_FIRST_INSTR;
+		next_instr = first_instr;
+		if (f->f_lasti >= 0) {
+			assert(f->f_lasti % sizeof(_Py_CODEUNIT) == 0);
+			next_instr += f->f_lasti / sizeof(_Py_CODEUNIT) + 1;
+		}
+	} else {
+		if ( f->bradds_f_next_instri > -1 ) {	//	A jump?
+			//	A jump to outside an iterator?
+			if ( f->bradds_f_flags & BRADDS_F_FLAGS_JUMP_OFF_FOR ) {
+				PyObject *iter = TOP();
+			//	if ( PySeqIter_Check(iter) ) {
+				if ( PyIter_Check(iter) ) {
+					STACKADJ(-1);
+					Py_DECREF(iter);
+				}
+			}
+
+			next_instr =   first_instr 
+						 + (f->bradds_f_next_instri / sizeof(_Py_CODEUNIT));
+			f->bradds_f_next_instri = -1;
+
+		} else
+			next_instr = f->bradds_f_next_instr;
+	}
+
+
+#ifdef LLTRACE
+    lltrace = _PyDict_GetItemId(f->f_globals, &PyId___ltrace__) != NULL;
+#endif
+
+    if (throwflag) /* support for generator.throw() */
+        goto error;
+
+    assert(!PyErr_Occurred());
+
+main_loop:
+    for (;;) {
+
+        assert(stack_pointer >= f->f_valuestack); /* else underflow */
+        assert(STACK_LEVEL() <= co->co_stacksize);  /* else overflow */
+        assert(!PyErr_Occurred());
+
+        /* Do periodic things.  Doing this every time through
+           the loop would add too much overhead, so we do it
+           only every Nth instruction.  We also do it if
+           ``pendingcalls_to_do'' is set, i.e. when an asynchronous
+           event needs attention (e.g. a signal handler or
+           async I/O handler); see Py_AddPendingCall() and
+           Py_MakePendingCalls() above. */
+
+        if (_Py_atomic_load_relaxed(&_PyRuntime.ceval.eval_breaker)) {
+            if (_Py_OPCODE(*next_instr) == SETUP_FINALLY ||
+                _Py_OPCODE(*next_instr) == YIELD_FROM) {
+                /* Two cases where we skip running signal handlers and other
+                   pending calls:
+                   - If we're about to enter the try: of a try/finally (not
+                     *very* useful, but might help in some cases and it's
+                     traditional)
+                   - If we're resuming a chain of nested 'yield from' or
+                     'await' calls, then each frame is parked with YIELD_FROM
+                     as its next opcode. If the user hit control-C we want to
+                     wait until we've reached the innermost frame before
+                     running the signal handler and raising KeyboardInterrupt
+                     (see bpo-30039).
+                */
+                goto fast_next_opcode;
+            }
+            if (_Py_atomic_load_relaxed(
+                        &_PyRuntime.ceval.pending.calls_to_do))
+            {
+                if (Py_MakePendingCalls() < 0)
+                    goto error;
+            }
+            if (_Py_atomic_load_relaxed(
+                        &_PyRuntime.ceval.gil_drop_request))
+            {
+                /* Give another thread a chance */
+                if (PyThreadState_Swap(NULL) != tstate)
+                    Py_FatalError("ceval: tstate mix-up");
+                drop_gil(tstate);
+
+                /* Other threads may run now */
+
+                take_gil(tstate);
+
+                /* Check if we should make a quick exit. */
+                if (_Py_IsFinalizing() &&
+                    !_Py_CURRENTLY_FINALIZING(tstate))
+                {
+                    drop_gil(tstate);
+                    PyThread_exit_thread();
+                }
+
+                if (PyThreadState_Swap(tstate) != NULL)
+                    Py_FatalError("ceval: orphan tstate");
+            }
+            /* Check for asynchronous exceptions. */
+            if (tstate->async_exc != NULL) {
+                PyObject *exc = tstate->async_exc;
+                tstate->async_exc = NULL;
+                UNSIGNAL_ASYNC_EXC();
+                PyErr_SetNone(exc);
+                Py_DECREF(exc);
+                goto error;
+            }
+        }
+
+    fast_next_opcode:
+        f->f_lasti = INSTR_OFFSET();
+
+        if (PyDTrace_LINE_ENABLED())
+            maybe_dtrace_line(f, instr_lb, instr_ub, instr_prev);
+
+        /* line-by-line tracing support */
+
+        if (_Py_TracingPossible &&
+            tstate->c_tracefunc != NULL && !tstate->tracing) {
+            int err;
+            /* see maybe_call_line_trace
+               for expository comments */
+            f->f_stacktop = stack_pointer;
+
+            err = maybe_call_line_trace(tstate->c_tracefunc,
+                                        tstate->c_traceobj,
+                                        tstate, f,
+                                        instr_lb, instr_ub, instr_prev);
+            /* Reload possibly changed frame fields */
+            JUMPTO(f->f_lasti);
+            if (f->f_stacktop != NULL) {
+                stack_pointer = f->f_stacktop;
+                f->f_stacktop = NULL;
+            }
+            if (err)
+                /* trace function raised an exception */
+                goto error;
+        }
+
+        /* Extract opcode and argument */
+
+        NEXTOPARG();
+    dispatch_opcode:
+
+#ifdef LLTRACE
+        /* Instruction tracing */
+
+        if (lltrace) {
+            if (HAS_ARG(opcode)) {
+                printf("%d: %d, %d\n",
+                       f->f_lasti, opcode, oparg);
+            }
+            else {
+                printf("%d: %d\n",
+                       f->f_lasti, opcode);
+            }
+        }
+#endif
+
+        switch (opcode) {
+
+        /* BEWARE!
+           It is essential that any operation that fails must goto error
+           and that all operation that succeed call [FAST_]DISPATCH() ! */
+		
+        TARGET(LOAD_FAST) {
+            PyObject *value = GETLOCAL(oparg);
+            if (value == NULL) {
+                format_exc_check_arg(PyExc_UnboundLocalError,
+                                     UNBOUNDLOCAL_ERROR_MSG,
+                                     PyTuple_GetItem(co->co_varnames, oparg));
+                goto error;
+            }
+            Py_INCREF(value);
+            PUSH(value);
+            FAST_DISPATCH();
+        }
+
+        PREDICTED(LOAD_CONST);
+        TARGET(LOAD_CONST) {
+            PyObject *value = GETITEM(consts, oparg);
+            Py_INCREF(value);
+        //  PUSH(value);
+			{ (void)(BASIC_PUSH(value), lltrace && prtrace(TOP(), "push")); 
+              assert(STACK_LEVEL() <= co->co_stacksize); }
+
+            FAST_DISPATCH();
+		}
+		
+        PREDICTED(STORE_FAST);
+        TARGET(STORE_FAST) {
+            PyObject *value = POP();
+            SETLOCAL(oparg, value);
+            FAST_DISPATCH();
+        }
+
+        TARGET(POP_TOP) {
+            PyObject *value = POP();
+            Py_DECREF(value);
+            FAST_DISPATCH();
+		}
+
+        TARGET(BINARY_ADD) {
+            PyObject *right = POP();
+            PyObject *left = TOP();
+            PyObject *sum;
+            /* NOTE(haypo): Please don't try to micro-optimize int+int on
+               CPython using bytecode, it is simply worthless.
+               See http://bugs.python.org/issue21955 and
+               http://bugs.python.org/issue10044 for the discussion. In short,
+               no patch shown any impact on a realistic benchmark, only a minor
+               speedup on microbenchmarks. */
+            if (PyUnicode_CheckExact(left) &&
+                     PyUnicode_CheckExact(right)) {
+                sum = unicode_concatenate(left, right, f, next_instr);
+                /* unicode_concatenate consumed the ref to left */
+            }
+            else {
+                sum = PyNumber_Add(left, right);
+                Py_DECREF(left);
+            }
+            Py_DECREF(right);
+            SET_TOP(sum);
+            if (sum == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(RETURN_VALUE) {
+            retval = POP();
+            assert(f->f_iblock == 0);
+
+			bradds_returning = 1;
+			bradds_was_native_call = 
+				(f->bradds_f_flags & BRADDS_F_FLAGS_NATIVE_CALL) != 0;
+			f->bradds_f_flags &= ~BRADDS_F_FLAGS_NATIVE_CALL;
+
+			goto return_or_yield;
+        }
+
+        PREDICTED(POP_BLOCK);
+        TARGET(POP_BLOCK) {
+            PyFrame_BlockPop(f);
+            DISPATCH();
+        }
+
+        TARGET(STORE_NAME) {
+            PyObject *name = GETITEM(names, oparg);
+            PyObject *v = POP();
+            PyObject *ns = f->f_locals;
+            int err;
+            if (ns == NULL) {
+                PyErr_Format(PyExc_SystemError,
+                             "no locals found when storing %R", name);
+                Py_DECREF(v);
+                goto error;
+            }
+            if (PyDict_CheckExact(ns))
+                err = PyDict_SetItem(ns, name, v);
+            else
+                err = PyObject_SetItem(ns, name, v);
+            Py_DECREF(v);
+            if (err != 0)
+                goto error;
+            DISPATCH();
+        }
+
+        PREDICTED(UNPACK_SEQUENCE);
+        TARGET(UNPACK_SEQUENCE) {
+            PyObject *seq = POP(), *item, **items;
+            if (PyTuple_CheckExact(seq) &&
+                PyTuple_GET_SIZE(seq) == oparg) {
+                items = ((PyTupleObject *)seq)->ob_item;
+                while (oparg--) {
+                    item = items[oparg];
+                    Py_INCREF(item);
+                    PUSH(item);
+                }
+            } else if (PyList_CheckExact(seq) &&
+                       PyList_GET_SIZE(seq) == oparg) {
+                items = ((PyListObject *)seq)->ob_item;
+                while (oparg--) {
+                    item = items[oparg];
+                    Py_INCREF(item);
+                    PUSH(item);
+                }
+            } else if (unpack_iterable(seq, oparg, -1,
+                                       stack_pointer + oparg)) {
+                STACKADJ(oparg);
+            } else {
+                /* unpack_iterable() raised an exception */
+                Py_DECREF(seq);
+                goto error;
+            }
+            Py_DECREF(seq);
+            DISPATCH();
+        }
+
+		TARGET(RECDEF_NAME) {
+			PyObject * def_name = GETITEM(names, oparg);
+
+			//	What creates and instantiates the command record?
+			//	A builtin? Like what is in import.c? Can a builtin be called
+			//	as a codeobject?
+			//
+			//	-	builtin___import__ (in bltinmodule.c) seems to be a 
+			//		codeobject that is callable.  I think.
+			//
+			//	We don't make the call here. We provide a callable that may 
+			//	be called later.
+
+			_Py_IDENTIFIER(__record_create__);
+			PyObject * func =
+				_PyDict_GetItemId ( f->f_builtins, &PyId___record_create__ );
+            if (func == NULL) 
+                goto error;
+			Py_INCREF(func);
+		//	PUSH(func);
+			PyObject * tup = PyTuple_Pack ( 2, func, def_name );
+			if ( tup == NULL )
+				goto error;
+			Py_INCREF(tup);
+			PUSH(tup);
+			DISPATCH();
+		}
+
+        TARGET(STORE_ATTR) {
+            PyObject *name = GETITEM(names, oparg);
+            PyObject *owner = TOP();
+            PyObject *v = SECOND();
+            int err;
+            STACKADJ(-2);
+            err = PyObject_SetAttr(owner, name, v);
+            Py_DECREF(v);
+            Py_DECREF(owner);
+            if (err != 0)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(STORE_GLOBAL) {
+            PyObject *name = GETITEM(names, oparg);
+            PyObject *v = POP();
+            int err;
+            err = PyDict_SetItem(f->f_globals, name, v);
+            Py_DECREF(v);
+            if (err != 0)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(LOAD_NAME) {
+            PyObject *name = GETITEM(names, oparg);
+            PyObject *locals = f->f_locals;
+            PyObject *v;
+            if (locals == NULL) {
+                PyErr_Format(PyExc_SystemError,
+                             "no locals when loading %R", name);
+                goto error;
+            }
+            if (PyDict_CheckExact(locals)) {
+                v = PyDict_GetItem(locals, name);
+                Py_XINCREF(v);
+            }
+            else {
+                v = PyObject_GetItem(locals, name);
+                if (v == NULL) {
+                    if (!PyErr_ExceptionMatches(PyExc_KeyError))
+                        goto error;
+                    PyErr_Clear();
+                }
+            }
+            if (v == NULL) {
+                v = PyDict_GetItem(f->f_globals, name);
+                Py_XINCREF(v);
+                if (v == NULL) {
+                    if (PyDict_CheckExact(f->f_builtins)) {
+                        v = PyDict_GetItem(f->f_builtins, name);
+                        if (v == NULL) {
+                            format_exc_check_arg(
+                                        PyExc_NameError,
+                                        NAME_ERROR_MSG, name);
+                            goto error;
+                        }
+                        Py_INCREF(v);
+                    }
+                    else {
+                        v = PyObject_GetItem(f->f_builtins, name);
+                        if (v == NULL) {
+                            if (PyErr_ExceptionMatches(PyExc_KeyError))
+                                format_exc_check_arg(
+                                            PyExc_NameError,
+                                            NAME_ERROR_MSG, name);
+                            goto error;
+                        }
+                    }
+                }
+            }
+            PUSH(v);
+			DISPATCH();
+        }
+
+        TARGET(LOAD_GLOBAL) {
+            PyObject *name = GETITEM(names, oparg);
+            PyObject *v;
+            if (PyDict_CheckExact(f->f_globals)
+                && PyDict_CheckExact(f->f_builtins))
+            {
+                v = _PyDict_LoadGlobal((PyDictObject *)f->f_globals,
+                                       (PyDictObject *)f->f_builtins,
+                                       name);
+                if (v == NULL) {
+                    if (!_PyErr_OCCURRED()) {
+                        /* _PyDict_LoadGlobal() returns NULL without raising
+                         * an exception if the key doesn't exist */
+                        format_exc_check_arg(PyExc_NameError,
+                                             NAME_ERROR_MSG, name);
+                    }
+                    goto error;
+                }
+                Py_INCREF(v);
+            }
+            else {
+                /* Slow-path if globals or builtins is not a dict */
+
+                /* namespace 1: globals */
+                v = PyObject_GetItem(f->f_globals, name);
+                if (v == NULL) {
+                    if (!PyErr_ExceptionMatches(PyExc_KeyError))
+                        goto error;
+                    PyErr_Clear();
+
+                    /* namespace 2: builtins */
+                    v = PyObject_GetItem(f->f_builtins, name);
+                    if (v == NULL) {
+                        if (PyErr_ExceptionMatches(PyExc_KeyError))
+                            format_exc_check_arg(
+                                        PyExc_NameError,
+                                        NAME_ERROR_MSG, name);
+                        goto error;
+                    }
+                }
+            }
+            PUSH(v);
+            DISPATCH();
+        }
+
+        TARGET(BUILD_LIST) {
+            PyObject *list =  PyList_New(oparg);
+            if (list == NULL)
+                goto error;
+            while (--oparg >= 0) {
+                PyObject *item = POP();
+                PyList_SET_ITEM(list, oparg, item);
+            }
+            PUSH(list);
+            DISPATCH();
+        }
+
+        TARGET(LOAD_ATTR) {
+            PyObject *name = GETITEM(names, oparg);
+            PyObject *owner = TOP();
+            PyObject *res = PyObject_GetAttr(owner, name);
+            Py_DECREF(owner);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        PREDICTED(JUMP_ABSOLUTE);
+        TARGET(JUMP_ABSOLUTE) {
+            JUMPTO(oparg);
+#if FAST_LOOPS
+            /* Enabling this path speeds-up all while and for-loops by bypassing
+               the per-loop checks for signals.  By default, this should be turned-off
+               because it prevents detection of a control-break in tight loops like
+               "while 1: pass".  Compile with this option turned-on when you need
+               the speed-up and do not need break checking inside tight loops (ones
+               that contain only instructions ending with FAST_DISPATCH).
+            */
+            FAST_DISPATCH();
+#else
+            DISPATCH();
+#endif
+        }
+
+        PREDICTED(FOR_ITER);
+        TARGET(FOR_ITER) {
+            /* before: [iter]; after: [iter, iter()] *or* [] */
+            PyObject *iter = TOP();
+            PyObject *next = (*iter->ob_type->tp_iternext)(iter);
+            if (next != NULL) {
+                PUSH(next);
+                PREDICT(STORE_FAST);
+                PREDICT(UNPACK_SEQUENCE);
+                DISPATCH();
+            }
+            if (PyErr_Occurred()) {
+                if (!PyErr_ExceptionMatches(PyExc_StopIteration))
+                    goto error;
+                else if (tstate->c_tracefunc != NULL)
+                    call_exc_trace(tstate->c_tracefunc, tstate->c_traceobj, tstate, f);
+                PyErr_Clear();
+            }
+            /* iterator ended normally */
+            STACKADJ(-1);
+            Py_DECREF(iter);
+            JUMPBY(oparg);
+			
+			int offs_next = INSTR_OFFSET();
+
+            PREDICT(POP_BLOCK);
+            DISPATCH();
+        }
+
+        TARGET(GET_ITER) {
+            /* before: [obj]; after [getiter(obj)] */
+            PyObject *iterable = TOP();
+            PyObject *iter = PyObject_GetIter(iterable);
+            Py_DECREF(iterable);
+            SET_TOP(iter);
+            if (iter == NULL)
+                goto error;
+            PREDICT(FOR_ITER);
+            PREDICT(CALL_FUNCTION);
+            DISPATCH();
+        }
+
+        PREDICTED(CALL_FUNCTION);
+        TARGET(CALL_FUNCTION) {
+            PyObject **sp, *res;
+            sp = stack_pointer;
+            res = call_function(&sp, oparg, NULL);
+
+			if ( res && f->bradds_f_flags & BRADDS_F_FLAGS_NEW_FRAME ) {
+				f->bradds_f_oparg = oparg;
+				retval = res;			//	this should be the new frame
+				Py_INCREF(retval);
+				NO_STACK_RETURN(); }
+			
+			if ( res && f->bradds_f_flags & BRADDS_F_FLAGS_CREATE_RECORD ) {
+				retval = res;
+				JUMPBACK(2);				//	to execute the statement again
+				Py_INCREF(retval);
+				NO_STACK_RETURN(); }
+
+			f->bradds_f_flags |= BRADDS_F_FLAGS_NATIVE_CALL;
+
+            stack_pointer = sp;
+            PUSH(res);
+            if (res == NULL) {
+                goto error;
+            }
+            DISPATCH();
+		}
+
+        TARGET(MAKE_FUNCTION) {
+            PyObject *qualname = POP();
+            PyObject *codeobj = POP();
+            PyFunctionObject *func = (PyFunctionObject *)
+                PyFunction_NewWithQualName(codeobj, f->f_globals, qualname);
+
+            Py_DECREF(codeobj);
+            Py_DECREF(qualname);
+            if (func == NULL) {
+                goto error;
+            }
+
+            if (oparg & 0x08) {
+                assert(PyTuple_CheckExact(TOP()));
+                func ->func_closure = POP();
+            }
+            if (oparg & 0x04) {
+                assert(PyDict_CheckExact(TOP()));
+                func->func_annotations = POP();
+            }
+            if (oparg & 0x02) {
+                assert(PyDict_CheckExact(TOP()));
+                func->func_kwdefaults = POP();
+            }
+            if (oparg & 0x01) {
+                assert(PyTuple_CheckExact(TOP()));
+                func->func_defaults = POP();
+            }
+
+            PUSH((PyObject *)func);
+            DISPATCH();
+        }
+
+		}	//	switch ( opcode )
+
+        /* This should never be reached. Every opcode should end with DISPATCH()
+           or goto error. */
+        Py_UNREACHABLE();
+
+error:
+        /* Double-check exception status. */
+        assert(PyErr_Occurred());
+
+        /* Log traceback info. */
+        PyTraceBack_Here(f);
+
+        if (tstate->c_tracefunc != NULL)
+            call_exc_trace(tstate->c_tracefunc, tstate->c_traceobj,
+                           tstate, f);
+
+exception_unwind:
+        /* Unwind stacks if an exception occurred */
+        while (f->f_iblock > 0) {
+            /* Pop the current block. */
+            PyTryBlock *b = &f->f_blockstack[--f->f_iblock];
+
+            if (b->b_type == EXCEPT_HANDLER) {
+                UNWIND_EXCEPT_HANDLER(b);
+                continue;
+            }
+            UNWIND_BLOCK(b);
+            if (b->b_type == SETUP_FINALLY) {
+                PyObject *exc, *val, *tb;
+                int handler = b->b_handler;
+                _PyErr_StackItem *exc_info = tstate->exc_info;
+                /* Beware, this invalidates all b->b_* fields */
+                PyFrame_BlockSetup(f, EXCEPT_HANDLER, -1, STACK_LEVEL());
+                PUSH(exc_info->exc_traceback);
+                PUSH(exc_info->exc_value);
+                if (exc_info->exc_type != NULL) {
+                    PUSH(exc_info->exc_type);
+                }
+                else {
+                    Py_INCREF(Py_None);
+                    PUSH(Py_None);
+                }
+                PyErr_Fetch(&exc, &val, &tb);
+                /* Make the raw exception data
+                   available to the handler,
+                   so a program can emulate the
+                   Python main loop. */
+                PyErr_NormalizeException(
+                    &exc, &val, &tb);
+                if (tb != NULL)
+                    PyException_SetTraceback(val, tb);
+                else
+                    PyException_SetTraceback(val, Py_None);
+                Py_INCREF(exc);
+                exc_info->exc_type = exc;
+                Py_INCREF(val);
+                exc_info->exc_value = val;
+                exc_info->exc_traceback = tb;
+                if (tb == NULL)
+                    tb = Py_None;
+                Py_INCREF(tb);
+                PUSH(tb);
+                PUSH(val);
+                PUSH(exc);
+                JUMPTO(handler);
+                /* Resume normal execution */
+                goto main_loop;
+            }
+        } /* unwind stack */
+
+        /* End the loop as we still have an error */
+        break;
+    } /* main loop */
+
+    /* Pop remaining stack entries. */
+    while (!EMPTY()) {
+        PyObject *o = POP();
+        Py_XDECREF(o);
+    }
+
+    assert(retval == NULL);
+    assert(PyErr_Occurred());
+	
+return_or_yield:
+    if (tstate->use_tracing) {
+        if (tstate->c_tracefunc) {
+            if (call_trace_protected(tstate->c_tracefunc, tstate->c_traceobj,
+                                     tstate, f, PyTrace_RETURN, retval)) {
+                Py_CLEAR(retval);
+            }
+        }
+        if (tstate->c_profilefunc) {
+            if (call_trace_protected(tstate->c_profilefunc, tstate->c_profileobj,
+                                     tstate, f, PyTrace_RETURN, retval)) {
+                Py_CLEAR(retval);
+            }
+        }
+    }
+
+    /* pop frame */
+exit_eval_frame:
+    if (PyDTrace_FUNCTION_RETURN_ENABLED())
+        dtrace_function_return(f);
+    Py_LeaveRecursiveCall();
+    f->f_executing = 0;
+
+	if ( bradds_returning && (! bradds_was_native_call) && f->f_back ) {
+
+		PyFrameObject * fb = f->f_back;
+
+		/*	What function_code_fastcall() does after otherwise returning from 
+			_EvalFrame (or whatever). 
+		*/
+		if (Py_REFCNT(f) > 1) {
+			Py_DECREF(f);
+			_PyObject_GC_TRACK(f);
+		}
+		else {
+			++tstate->recursion_depth;
+			Py_DECREF(f);
+			--tstate->recursion_depth;
+		}
+
+		/*	Something like what call_function() does.
+
+			Clear the stack of the function object.
+		*/
+		PyObject **pp_stack = fb->f_stacktop;
+		oparg = fb->bradds_f_oparg;
+	    PyObject **pfunc = (pp_stack) - oparg - 1;
+
+		while ((pp_stack) > pfunc) {
+			PyObject * w = EXT_POP(pp_stack);
+			Py_DECREF(w);
+		}
+
+		/*	As a first approximation, I think thats it.
+		*/
+		tstate->frame = fb;
+		//	retval needs to be pushed on the calling frame's value stack.
+	//	 fb->bradds_f_stack_pointer   = pp_stack;
+	//	*fb->bradds_f_stack_pointer++ = retval;
+	//	assert(((int)(fb->bradds_f_stack_pointer - fb->f_valuestack)) <= fb->f_code->co_stacksize);
+		//	Use fb->f_stacktop? Actually, this might be generally necessary.
+		 fb->f_stacktop   = pp_stack;
+		*fb->f_stacktop++ = retval;
+		assert(((int)(fb->f_stacktop - fb->f_valuestack)) <= fb->f_code->co_stacksize);
+
+		f->bradds_f_flags |= BRADDS_F_FLAGS_RETURN;
+	}
+	else
+		tstate->frame = f->f_back;
+
+    return _Py_CheckFunctionResult(NULL, retval, "PyEval_EvalFrameEx");
+
+}	//	_BradDs_PyEval_EvalFrameDefault()
 
 static void
 format_missing(const char *kind, PyCodeObject *co, PyObject *names)
@@ -4310,6 +5338,39 @@ maybe_call_line_trace(Py_tracefunc func, PyObject *obj,
     return result;
 }
 
+static int
+bradds_maybe_ ( PyFrameObject * frame, int nexti,
+				int *instr_lb, int *instr_ub, int *instr_prev )
+{
+	/*	Based on maybe_call_line_trace() ...
+
+		Instead of frame->f_lasti its nexti.
+	*/
+    int  result = 0;
+    int  line = frame->f_lineno;
+
+    /* If the last instruction executed isn't in the current
+       instruction window, reset the window.
+    */
+    if (nexti < *instr_lb || nexti >= *instr_ub) {
+        PyAddrPair bounds;
+        line = _PyCode_CheckLineNumber(frame->f_code, nexti,
+                                       &bounds);
+        *instr_lb = bounds.ap_lower;
+        *instr_ub = bounds.ap_upper;
+    }
+    /* If the last instruction falls at the start of a line or if it
+       represents a jump backwards, update the frame's line number and
+       then call the trace function if we're tracing source lines.
+    */
+    if ((nexti == *instr_lb || nexti < *instr_prev)) {
+        frame->f_lineno = line;
+		result = 1;
+    }
+    *instr_prev = nexti;
+    return result;
+}	/*	bradds_maybe_() */
+
 void
 PyEval_SetProfile(Py_tracefunc func, PyObject *arg)
 {
@@ -4546,6 +5607,17 @@ call_function(PyObject ***pp_stack, Py_ssize_t oparg, PyObject *kwnames)
     Py_ssize_t nargs = oparg - nkwargs;
     PyObject **stack = (*pp_stack) - nargs - nkwargs;
 
+	if ( PyTuple_Check ( func ) ) {		//	bradd
+		PyObject * def_name = PyTuple_GetItem ( func, 1 );
+		func = PyTuple_GetItem ( func, 0 );
+		PyObject* stack[2];		nargs = 2;
+		stack[0] = def_name;
+		stack[1] = *((*pp_stack) - oparg);		//	?	should be rec-name
+		char * sRN = (char *)PyUnicode_DATA ( stack[1] );
+	    PyThreadState * tstate = PyThreadState_GET();
+        C_TRACE(x, _PyCFunction_FastCallKeywords(func, stack, nargs, kwnames));
+	}
+	else
     /* Always dispatch PyCFunction first, because these are
        presumed to be the most frequent callable object.
     */
@@ -4600,6 +5672,10 @@ call_function(PyObject ***pp_stack, Py_ssize_t oparg, PyObject *kwnames)
 
         if (PyFunction_Check(func)) {
             x = _PyFunction_FastCallKeywords(func, stack, nargs, kwnames);
+	        PyThreadState * tstate = PyThreadState_GET();	//	bradds
+			if ( tstate->frame->bradds_f_flags & BRADDS_F_FLAGS_NEW_FRAME ) {
+				Py_DECREF(func);
+				return x; }
         }
         else {
             x = _PyObject_FastCallKeywords(func, stack, nargs, kwnames);

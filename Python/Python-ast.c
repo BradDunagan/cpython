@@ -170,6 +170,10 @@ static char *ImportFrom_fields[]={
     "names",
     "level",
 };
+static PyTypeObject *Recdef_type;
+static char *Recdef_fields[]={
+    "name",
+};
 static PyTypeObject *Global_type;
 static char *Global_fields[]={
     "names",
@@ -895,6 +899,8 @@ static int init_types(void)
     if (!Import_type) return 0;
     ImportFrom_type = make_type("ImportFrom", stmt_type, ImportFrom_fields, 3);
     if (!ImportFrom_type) return 0;
+    Recdef_type = make_type("Recdef", stmt_type, Recdef_fields, 1);
+    if (!Recdef_type) return 0;
     Global_type = make_type("Global", stmt_type, Global_fields, 1);
     if (!Global_type) return 0;
     Nonlocal_type = make_type("Nonlocal", stmt_type, Nonlocal_fields, 1);
@@ -1645,6 +1651,25 @@ ImportFrom(identifier module, asdl_seq * names, int level, int lineno, int
     p->v.ImportFrom.module = module;
     p->v.ImportFrom.names = names;
     p->v.ImportFrom.level = level;
+    p->lineno = lineno;
+    p->col_offset = col_offset;
+    return p;
+}
+
+stmt_ty
+Recdef(identifier name, int lineno, int col_offset, PyArena *arena)
+{
+    stmt_ty p;
+    if (!name) {
+        PyErr_SetString(PyExc_ValueError,
+                        "field name is required for Recdef");
+        return NULL;
+    }
+    p = (stmt_ty)PyArena_Malloc(arena, sizeof(*p));
+    if (!p)
+        return NULL;
+    p->kind = Recdef_kind;
+    p->v.Recdef.name = name;
     p->lineno = lineno;
     p->col_offset = col_offset;
     return p;
@@ -2983,6 +3008,15 @@ ast2obj_stmt(void* _o)
         value = ast2obj_int(o->v.ImportFrom.level);
         if (!value) goto failed;
         if (_PyObject_SetAttrId(result, &PyId_level, value) == -1)
+            goto failed;
+        Py_DECREF(value);
+        break;
+    case Recdef_kind:
+        result = PyType_GenericNew(Recdef_type, NULL, NULL);
+        if (!result) goto failed;
+        value = ast2obj_identifier(o->v.Recdef.name);
+        if (!value) goto failed;
+        if (_PyObject_SetAttrId(result, &PyId_name, value) == -1)
             goto failed;
         Py_DECREF(value);
         break;
@@ -5598,6 +5632,30 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
         if (*out == NULL) goto failed;
         return 0;
     }
+    isinstance = PyObject_IsInstance(obj, (PyObject*)Recdef_type);
+    if (isinstance == -1) {
+        return 1;
+    }
+    if (isinstance) {
+        identifier name;
+
+        if (_PyObject_LookupAttrId(obj, &PyId_name, &tmp) < 0) {
+            return 1;
+        }
+        if (tmp == NULL) {
+            PyErr_SetString(PyExc_TypeError, "required field \"name\" missing from Recdef");
+            return 1;
+        }
+        else {
+            int res;
+            res = obj2ast_identifier(tmp, &name, arena);
+            if (res != 0) goto failed;
+            Py_CLEAR(tmp);
+        }
+        *out = Recdef(name, lineno, col_offset, arena);
+        if (*out == NULL) goto failed;
+        return 0;
+    }
     isinstance = PyObject_IsInstance(obj, (PyObject*)Global_type);
     if (isinstance == -1) {
         return 1;
@@ -8204,6 +8262,8 @@ PyInit__ast(void)
         NULL;
     if (PyDict_SetItemString(d, "ImportFrom", (PyObject*)ImportFrom_type) < 0)
         return NULL;
+    if (PyDict_SetItemString(d, "Recdef", (PyObject*)Recdef_type) < 0) return
+        NULL;
     if (PyDict_SetItemString(d, "Global", (PyObject*)Global_type) < 0) return
         NULL;
     if (PyDict_SetItemString(d, "Nonlocal", (PyObject*)Nonlocal_type) < 0)

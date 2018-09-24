@@ -138,6 +138,16 @@ PyAPI_FUNC(PyObject *) PyEval_EvalFrame(struct _frame *);
 PyAPI_FUNC(PyObject *) PyEval_EvalFrameEx(struct _frame *f, int exc);
 #ifndef Py_LIMITED_API
 PyAPI_FUNC(PyObject *) _PyEval_EvalFrameDefault(struct _frame *f, int exc);
+
+PyAPI_FUNC(int)	_BradDs_PyEval_EvalFrameDefault_Init ( struct _frame * f,
+													   int * instr_lb,
+													   int * instr_ub,
+													   int * instr_prev ) ;
+PyAPI_FUNC(PyObject *)	_BradDs_PyEval_EvalFrameDefault ( struct _frame * f, 
+														  int exc,
+														  int * instr_lb,
+														  int * instr_ub,
+														  int * instr_prev ) ;
 #endif
 
 /* Interface for threads.

@@ -3384,6 +3384,40 @@ ast_for_import_stmt(struct compiling *c, const node *n)
 }
 
 static stmt_ty
+ast_for_recdef_stmt(struct compiling *c, const node *n)
+{
+    /*
+	  recdef_stmt: recdef_name
+	  recdef_name: 'recdef' NAME
+
+      import_stmt: import_name | import_from
+      import_name: 'import' dotted_as_names
+      import_from: 'from' (('.' | '...')* dotted_name | ('.' | '...')+)
+                   'import' ('*' | '(' import_as_names ')' | import_as_names)
+    */
+	identifier name;
+    int lineno;
+    int col_offset;
+    int i;
+    asdl_seq *aliases;
+
+    REQ(n, recdef_stmt);
+    lineno = LINENO(n);
+    col_offset = n->n_col_offset;
+    n = CHILD(n, 0);
+    if (TYPE(n) == recdef_name) {
+        n = CHILD(n, 1);
+        REQ(n, NAME);
+		name = NEW_IDENTIFIER(n);
+
+        return Recdef(name, lineno, col_offset, c->c_arena);
+    }
+    PyErr_Format(PyExc_SystemError,
+                 "unknown recdef statement");
+    return NULL;
+}
+
+static stmt_ty
 ast_for_global_stmt(struct compiling *c, const node *n)
 {
     /* global_stmt: 'global' NAME (',' NAME)* */
@@ -3989,6 +4023,8 @@ ast_for_stmt(struct compiling *c, const node *n)
                 return ast_for_flow_stmt(c, n);
             case import_stmt:
                 return ast_for_import_stmt(c, n);
+			case recdef_stmt:
+				return ast_for_recdef_stmt(c, n);
             case global_stmt:
                 return ast_for_global_stmt(c, n);
             case nonlocal_stmt:

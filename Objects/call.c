@@ -280,6 +280,13 @@ function_code_fastcall(PyCodeObject *co, PyObject *const *args, Py_ssize_t nargs
         Py_INCREF(*args);
         fastlocals[i] = *args++;
     }
+
+	PyFrameObject * fb = f->f_back;		//	bradds
+	if ( fb && (fb->bradds_f_flags & BRADDS_F_FLAGS_NO_STACK) ) {
+		fb->bradds_f_flags |= BRADDS_F_FLAGS_NEW_FRAME;
+	//	f->bradds_f_flags |= BRADDS_F_FLAGS_RETURN;
+		return (PyObject *)f; }
+
     result = PyEval_EvalFrameEx(f,0);
 
     if (Py_REFCNT(f) > 1) {

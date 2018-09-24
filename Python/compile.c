@@ -1027,6 +1027,9 @@ stack_effect(int opcode, int oparg, int jump)
         case IMPORT_FROM:
             return 1;
 
+		case RECDEF_NAME:
+			return 1;			//	XXXBD	Is this right?
+
         /* Jumps */
         case JUMP_FORWARD:
         case JUMP_ABSOLUTE:
@@ -2904,6 +2907,58 @@ compiler_from_import(struct compiler *c, stmt_ty s)
 }
 
 static int
+compiler_recdef ( struct compiler *c, stmt_ty s )
+{
+	/* Based on (inspired by) compiler_import().
+	   For now, simple. Just one name.
+	 */
+	/*
+    Py_ssize_t i, n = asdl_seq_LEN(s->v.Import.names);
+
+    for (i = 0; i < n; i++) {
+        alias_ty alias = (alias_ty)asdl_seq_GET(s->v.Import.names, i);
+        int r;
+
+        ADDOP_LOAD_CONST(c, _PyLong_Zero);
+        ADDOP_LOAD_CONST(c, Py_None);
+        ADDOP_NAME(c, IMPORT_NAME, alias->name, names);
+
+        if (alias->asname) {
+            r = compiler_import_as(c, alias->name, alias->asname);
+            if (!r)
+                return r;
+        }
+        else {
+            identifier tmp = alias->name;
+            Py_ssize_t dot = PyUnicode_FindChar(
+                alias->name, '.', 0, PyUnicode_GET_LENGTH(alias->name), 1);
+            if (dot != -1) {
+                tmp = PyUnicode_Substring(alias->name, 0, dot);
+                if (tmp == NULL)
+                    return 0;
+            }
+            r = compiler_nameop(c, tmp, Store);
+            if (dot != -1) {
+                Py_DECREF(tmp);
+            }
+            if (!r)
+                return r;
+        }
+    }
+	*/
+	ADDOP_NAME(c, RECDEF_NAME, s->v.Recdef.name, names);
+	identifier tmp = s->v.Recdef.name;
+
+	const char * sn = (char *)PyUnicode_DATA ( tmp );
+
+	int r = compiler_nameop ( c, tmp, Store );
+	if ( ! r )
+		return r;
+
+    return 1;
+}
+
+static int
 compiler_assert(struct compiler *c, stmt_ty s)
 {
     static PyObject *assertion_error = NULL;
@@ -3036,6 +3091,8 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
         return compiler_import(c, s);
     case ImportFrom_kind:
         return compiler_from_import(c, s);
+	case Recdef_kind:
+        return compiler_recdef(c, s);
     case Global_kind:
     case Nonlocal_kind:
         break;

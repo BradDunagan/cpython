@@ -331,6 +331,77 @@ perform absolute or relative imports: 0 is absolute, while a positive number\n\
 is the number of parent directories to search relative to the current module.");
 
 
+//	bradd
+//
+#include	"internal/pystate.h"
+#include	"frameobject.h"
+
+/*
+static PyObject * PyRecord_Create_Part_1 ( PyObject * name )
+{
+    PyThreadState * tstate = PyThreadState_GET();
+	PyFrameObject * f = tstate->frame;
+	f->bradds_f_flags |= BRADDS_F_FLAGS_CREATE_RECORD;
+	return name;
+}
+*/
+
+static BradDs_CreateRecordCB crCB = 0;
+
+int		_BradDs_SetCreateRecordCB ( BradDs_CreateRecordCB CB ) 
+{
+	crCB = CB;
+	return 0;
+}
+
+static PyObject *
+builtin___record_create__ ( PyObject *self, PyObject *args, PyObject *kwds )
+{
+	//	Based on builtin___import__(). Really don't know for sure what I 
+	//	am doing here.  For now.
+
+//	static char * kwlist[] = {"name", "globals", "locals", 0};
+//	static char * kwlist[] = {"name",                      0};
+	static char * kwlist[] = {"def-name", "rec-name", 0};
+	PyObject * def_name, * rec_name;
+
+    if ( ! PyArg_ParseTupleAndKeywords ( args, kwds, 
+//										 "U|OOOi:__record_create__",
+										 "UU|OOOi:__record_create__",
+//										 kwlist, &name, &globals, &locals ) ) {
+										 kwlist, &def_name, &rec_name ) ) {
+	    if (PyErr_Occurred()) {
+			PyErr_Print();
+		}
+        return NULL; 
+	}
+
+	//	What is happening when a record is created?
+	//	-	Get a new record ID.
+	//	-	Got to know the definition which is specified by name (and
+	//		type spec, later).
+	//	-	Load the definition record.
+	//	-	The result (what is returned) acts, looks like a module.
+	//	-	A null reference to the new record is created.
+	//	This is done "async". Possibly with a call to Javascript side.
+	//	When Javascript provides the ID and the definition then part 2
+	//	of this is executed.
+	//	-	Another reference is created when the record is assigned to
+	//		a variable.
+//  return PyImport_ImportModuleLevelObject(name, globals, locals,
+//                                          fromlist, level);
+//	return PyRecord_Create_Part_1 ( name );
+	if ( ! crCB )
+		return Py_None;
+	return crCB ( def_name, rec_name );
+}
+
+PyDoc_STRVAR(record_create_doc,
+"__record_create__(name, globals=None, locals=None) -> module\n\
+\n\
+Create a \"command\" record - which will be a module - from a specified\n\
+definition record. ALPHA Not to be called directly.");
+
 /*[clinic input]
 abs as builtin_abs
 

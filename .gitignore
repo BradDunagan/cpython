@@ -114,3 +114,7 @@ Tools/ssl/win32
 .vs/
 .vscode/
 gmon.out
+
+*stderr.txt
+*stdout.txt
+printenv-out.txt

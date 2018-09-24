@@ -771,6 +771,15 @@ _PyFrame_New_NoTrack(PyThreadState *tstate, PyCodeObject *code,
     f->f_trace_opcodes = 0;
     f->f_trace_lines = 1;
 
+	f->bradds_f_flags = (back 
+						 && (back->bradds_f_flags & BRADDS_F_FLAGS_NO_STACK))
+						? BRADDS_F_FLAGS_NO_STACK
+						: 0;
+	f->bradds_f_next_instr  =  0;
+	f->bradds_f_next_instri = -1;
+	f->bradds_f_oparg = 0;
+//	f->bradds_async_arg = 0;
+
     return f;
 }
 

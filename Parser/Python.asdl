@@ -46,6 +46,8 @@ module Python
           | Import(alias* names)
           | ImportFrom(identifier? module, alias* names, int? level)
 
+          | Recdef(identifier name)
+
           | Global(identifier* names)
           | Nonlocal(identifier* names)
           | Expr(expr value)

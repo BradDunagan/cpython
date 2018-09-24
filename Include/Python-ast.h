@@ -69,8 +69,8 @@ enum _stmt_kind {FunctionDef_kind=1, AsyncFunctionDef_kind=2, ClassDef_kind=3,
                   AsyncFor_kind=10, While_kind=11, If_kind=12, With_kind=13,
                   AsyncWith_kind=14, Raise_kind=15, Try_kind=16,
                   Assert_kind=17, Import_kind=18, ImportFrom_kind=19,
-                  Global_kind=20, Nonlocal_kind=21, Expr_kind=22, Pass_kind=23,
-                  Break_kind=24, Continue_kind=25};
+                  Recdef_kind=20, Global_kind=21, Nonlocal_kind=22,
+                  Expr_kind=23, Pass_kind=24, Break_kind=25, Continue_kind=26};
 struct _stmt {
     enum _stmt_kind kind;
     union {
@@ -186,6 +186,10 @@ struct _stmt {
             asdl_seq *names;
             int level;
         } ImportFrom;
+
+        struct {
+            identifier name;
+        } Recdef;
 
         struct {
             asdl_seq *names;
@@ -507,6 +511,8 @@ stmt_ty _Py_Import(asdl_seq * names, int lineno, int col_offset, PyArena
 #define ImportFrom(a0, a1, a2, a3, a4, a5) _Py_ImportFrom(a0, a1, a2, a3, a4, a5)
 stmt_ty _Py_ImportFrom(identifier module, asdl_seq * names, int level, int
                        lineno, int col_offset, PyArena *arena);
+#define Recdef(a0, a1, a2, a3) _Py_Recdef(a0, a1, a2, a3)
+stmt_ty _Py_Recdef(identifier name, int lineno, int col_offset, PyArena *arena);
 #define Global(a0, a1, a2, a3) _Py_Global(a0, a1, a2, a3)
 stmt_ty _Py_Global(asdl_seq * names, int lineno, int col_offset, PyArena
                    *arena);

@@ -1251,6 +1251,13 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
     case ImportFrom_kind:
         VISIT_SEQ(st, alias, s->v.ImportFrom.names);
         break;
+    case Recdef_kind:
+    //  VISIT_SEQ(st, alias, s->v.Recdef.name);
+        if (!symtable_add_def(st, s->v.Recdef.name, DEF_GLOBAL))
+            VISIT_QUIT(st, 0);
+        if (!symtable_record_directive(st, s->v.Recdef.name, s))
+            VISIT_QUIT(st, 0);
+        break;
     case Global_kind: {
         int i;
         asdl_seq *seq = s->v.Global.names;
