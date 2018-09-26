@@ -3962,9 +3962,9 @@ main_loop:
         TARGET(LOAD_CONST) {
             PyObject *value = GETITEM(consts, oparg);
             Py_INCREF(value);
-        //  PUSH(value);
-			{ (void)(BASIC_PUSH(value), lltrace && prtrace(TOP(), "push")); 
-              assert(STACK_LEVEL() <= co->co_stacksize); }
+            PUSH(value);
+		//	{ (void)(BASIC_PUSH(value), lltrace && prtrace(TOP(), "push")); 
+        //    assert(STACK_LEVEL() <= co->co_stacksize); }
 
             FAST_DISPATCH();
 		}

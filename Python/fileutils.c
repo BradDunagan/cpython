@@ -964,6 +964,9 @@ _Py_get_inheritable(int fd)
 static int
 set_inheritable(int fd, int inheritable, int raise, int *atomic_flag_works)
 {
+#ifdef EMSCRIPTEN
+    return 0;
+#else
 #ifdef MS_WINDOWS
     HANDLE handle;
     DWORD flags;
@@ -1079,6 +1082,7 @@ set_inheritable(int fd, int inheritable, int raise, int *atomic_flag_works)
         return -1;
     }
     return 0;
+#endif
 #endif
 }
 
