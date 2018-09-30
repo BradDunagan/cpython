@@ -1017,6 +1017,11 @@ insertdict(PyDictObject *mp, PyObject *key, Py_hash_t hash, PyObject *value)
     assert(PyUnicode_CheckExact(key) || mp->ma_keys->dk_lookup == lookdict);
     MAINTAIN_TRACKING(mp, key, value);
 
+//  if (    PyUnicode_Check ( key )
+//       && (PyUnicode_CompareWithASCIIString ( key, "excepthook" ) == 0) ) {
+//     PySys_WriteStderr("\nbradds dbug insertdict(): excepthook\n");
+//  }
+
     /* When insertion order is different from shared key, we can't share
      * the key anymore.  Convert this instance to combine table.
      */
