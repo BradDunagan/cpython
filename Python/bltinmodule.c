@@ -2799,7 +2799,8 @@ PyTypeObject PyZip_Type = {
 static PyMethodDef builtin_methods[] = {
     {"__build_class__", (PyCFunction)builtin___build_class__,
      METH_FASTCALL | METH_KEYWORDS, build_class_doc},
-    {"__import__",      (PyCFunction)builtin___import__, METH_VARARGS | METH_KEYWORDS, import_doc},
+    {"__import__",        (PyCFunction)builtin___import__,        METH_VARARGS | METH_KEYWORDS, import_doc},
+    {"__record_create__", (PyCFunction)builtin___record_create__, METH_VARARGS | METH_KEYWORDS, record_create_doc},
     BUILTIN_ABS_METHODDEF
     BUILTIN_ALL_METHODDEF
     BUILTIN_ANY_METHODDEF
