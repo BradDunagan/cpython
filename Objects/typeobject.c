@@ -3279,6 +3279,8 @@ type_dealloc(PyTypeObject *type)
     PyObject *tp, *val, *tb;
 
     /* Assert this is a heap-allocated type object */
+    if ( ! (type->tp_flags & Py_TPFLAGS_HEAPTYPE) ) 
+        PySys_WriteStderr ( "\nbradds dbug type_dealloc())\n" );
     assert(type->tp_flags & Py_TPFLAGS_HEAPTYPE);
     _PyObject_GC_UNTRACK(type);
     PyErr_Fetch(&tp, &val, &tb);

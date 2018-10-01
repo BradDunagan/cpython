@@ -980,6 +980,16 @@ _Py_InitializeMainInterpreter(PyInterpreterState *interp,
 
     _PyRuntime.initialized = 1;
 
+//  {
+//      PyObject * sysPath = PySys_GetObject ( "path" );
+//      if ( PyUnicode_Check ( sysPath ) ) {
+//          const char * path = (char *)PyUnicode_DATA ( sysPath );
+//          PySys_WriteStderr ( "\nbradds dbug _Py_InitializeMainInterpreter(): "
+//                              "path: %s\n",
+//                              path );
+//      }
+//  }
+
     if (!Py_NoSiteFlag) {
         err = initsite(); /* Module site */
         if (_Py_INIT_FAILED(err)) {
@@ -1008,6 +1018,11 @@ _Py_InitializeFromConfig(const _PyCoreConfig *config)
     _PyMainInterpreterConfig main_config = _PyMainInterpreterConfig_INIT;
     err = _PyMainInterpreterConfig_Read(&main_config, config);
     if (!_Py_INIT_FAILED(err)) {
+//    	const char * prefix = (char *)PyUnicode_DATA ( main_config.prefix );
+//      PySys_WriteStderr ( "\nbradds dbug _Py_InitializeFromConfig(): "
+//                          "prefix: %s \n",
+//                          prefix );
+
         err = _Py_InitializeMainInterpreter(interp, &main_config);
     }
     _PyMainInterpreterConfig_Clear(&main_config);

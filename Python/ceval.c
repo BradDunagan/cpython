@@ -551,6 +551,18 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 PyObject* _Py_HOT_FUNCTION
 _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
 {
+//  {
+//  	const char * name = (char *)PyUnicode_DATA ( f->f_code->co_name );
+//  	const char * filename = (char *)PyUnicode_DATA ( f->f_code->co_filename );
+//
+//      if ( strstr ( filename, "/lib/" ) ) {
+//          PySys_WriteStderr ( "\nbradds dbug _PyEval_EvalFrameDefault(): "
+//                              "co_name: %s  "
+//                              "co_filenane: %s\n",
+//                              name, filename );
+//      }
+//  }
+
 #ifdef DXPAIRS
     int lastopcode = 0;
 #endif
@@ -3527,6 +3539,7 @@ _BradDs_PyEval_EvalFrameDefault ( PyFrameObject *f, int throwflag,
     const _Py_CODEUNIT *next_instr;
     int opcode;        /* Current opcode */
     int oparg;         /* Current opcode argument, if any */
+    enum why_code why; /* Reason for block stack unwind */
     PyObject **fastlocals, **freevars;
     PyObject *retval = NULL;            /* Return value */
     PyThreadState *tstate = PyThreadState_GET();
@@ -3593,7 +3606,7 @@ _BradDs_PyEval_EvalFrameDefault ( PyFrameObject *f, int throwflag,
 #define NO_STACK_RETURN()					\
 	f->f_stacktop = stack_pointer;			\
 	f->bradds_f_next_instr = next_instr;	\
-	goto return_or_yield										
+	goto fast_yield;										
 #define DISPATCH()													\
 	if ( bradds_maybe_ ( f, INSTR_OFFSET(),							\
 							instr_lb, instr_ub, instr_prev ) ) {	\
@@ -3812,6 +3825,8 @@ _BradDs_PyEval_EvalFrameDefault ( PyFrameObject *f, int throwflag,
     lltrace = _PyDict_GetItemId(f->f_globals, &PyId___ltrace__) != NULL;
 #endif
 
+    why = WHY_NOT;
+
     if (throwflag) /* support for generator.throw() */
         goto error;
 
@@ -4010,19 +4025,48 @@ main_loop:
 
         TARGET(RETURN_VALUE) {
             retval = POP();
-            assert(f->f_iblock == 0);
-
+            why = WHY_RETURN;
+        //  goto fast_block_end;
 			bradds_returning = 1;
 			bradds_was_native_call = 
 				(f->bradds_f_flags & BRADDS_F_FLAGS_NATIVE_CALL) != 0;
 			f->bradds_f_flags &= ~BRADDS_F_FLAGS_NATIVE_CALL;
-
-			goto return_or_yield;
+            goto fast_yield;
         }
 
         PREDICTED(POP_BLOCK);
         TARGET(POP_BLOCK) {
-            PyFrame_BlockPop(f);
+            PyTryBlock *b = PyFrame_BlockPop(f);
+            UNWIND_BLOCK(b);
+            DISPATCH();
+        }
+
+        TARGET(LOAD_BUILD_CLASS) {
+            _Py_IDENTIFIER(__build_class__);
+
+            PyObject *bc;
+            if (PyDict_CheckExact(f->f_builtins)) {
+                bc = _PyDict_GetItemId(f->f_builtins, &PyId___build_class__);
+                if (bc == NULL) {
+                    PyErr_SetString(PyExc_NameError,
+                                    "__build_class__ not found");
+                    goto error;
+                }
+                Py_INCREF(bc);
+            }
+            else {
+                PyObject *build_class_str = _PyUnicode_FromId(&PyId___build_class__);
+                if (build_class_str == NULL)
+                    goto error;
+                bc = PyObject_GetItem(f->f_builtins, build_class_str);
+                if (bc == NULL) {
+                    if (PyErr_ExceptionMatches(PyExc_KeyError))
+                        PyErr_SetString(PyExc_NameError,
+                                        "__build_class__ not found");
+                    goto error;
+                }
+            }
+            PUSH(bc);
             DISPATCH();
         }
 
@@ -4250,6 +4294,20 @@ main_loop:
             DISPATCH();
         }
 
+        TARGET(IMPORT_NAME) {
+            PyObject *name = GETITEM(names, oparg);
+            PyObject *fromlist = POP();
+            PyObject *level = TOP();
+            PyObject *res;
+            res = import_name(f, name, fromlist, level);
+            Py_DECREF(level);
+            Py_DECREF(fromlist);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
         PREDICTED(JUMP_ABSOLUTE);
         TARGET(JUMP_ABSOLUTE) {
             JUMPTO(oparg);
@@ -4290,7 +4348,7 @@ main_loop:
             Py_DECREF(iter);
             JUMPBY(oparg);
 			
-			int offs_next = INSTR_OFFSET();
+			int offs_next = INSTR_OFFSET();     // bradds?
 
             PREDICT(POP_BLOCK);
             DISPATCH();
@@ -4306,6 +4364,19 @@ main_loop:
                 goto error;
             PREDICT(FOR_ITER);
             PREDICT(CALL_FUNCTION);
+            DISPATCH();
+        }
+
+        TARGET(SETUP_LOOP)
+        TARGET(SETUP_EXCEPT)
+        TARGET(SETUP_FINALLY) {
+            /* NOTE: If you add any new block-setup opcodes that
+               are not try/except/finally handlers, you may need
+               to update the PyGen_NeedsFinalizing() function.
+               */
+
+            PyFrame_BlockSetup(f, opcode, INSTR_OFFSET() + oparg,
+                               STACK_LEVEL());
             DISPATCH();
         }
 
@@ -4370,6 +4441,17 @@ main_loop:
             DISPATCH();
         }
 
+#if USE_COMPUTED_GOTOS
+        _unknown_opcode:
+#endif
+        default:
+            fprintf(stderr,
+                "XXX lineno: %d, opcode: %d\n",
+                PyFrame_GetLineNumber(f),
+                opcode);
+            PyErr_SetString(PyExc_SystemError, "unknown opcode");
+            goto error;
+
 		}	//	switch ( opcode )
 
         /* This should never be reached. Every opcode should end with DISPATCH()
@@ -4377,8 +4459,18 @@ main_loop:
         Py_UNREACHABLE();
 
 error:
+
+        assert(why == WHY_NOT);
+        why = WHY_EXCEPTION;
+
         /* Double-check exception status. */
+#ifdef NDEBUG
+        if (!PyErr_Occurred())
+            PyErr_SetString(PyExc_SystemError,
+                            "error return without exception set");
+#else
         assert(PyErr_Occurred());
+#endif
 
         /* Log traceback info. */
         PyTraceBack_Here(f);
@@ -4387,18 +4479,36 @@ error:
             call_exc_trace(tstate->c_tracefunc, tstate->c_traceobj,
                            tstate, f);
 
-exception_unwind:
-        /* Unwind stacks if an exception occurred */
-        while (f->f_iblock > 0) {
-            /* Pop the current block. */
-            PyTryBlock *b = &f->f_blockstack[--f->f_iblock];
+fast_block_end:
+        assert(why != WHY_NOT);
+
+        /* Unwind stacks if a (pseudo) exception occurred */
+        while (why != WHY_NOT && f->f_iblock > 0) {
+            /* Peek at the current block. */
+            PyTryBlock *b = &f->f_blockstack[f->f_iblock - 1];
+
+            assert(why != WHY_YIELD);
+            if (b->b_type == SETUP_LOOP && why == WHY_CONTINUE) {
+                why = WHY_NOT;
+                JUMPTO(PyLong_AS_LONG(retval));
+                Py_DECREF(retval);
+                break;
+            }
+            /* Now we have to pop the block. */
+            f->f_iblock--;
 
             if (b->b_type == EXCEPT_HANDLER) {
                 UNWIND_EXCEPT_HANDLER(b);
                 continue;
             }
             UNWIND_BLOCK(b);
-            if (b->b_type == SETUP_FINALLY) {
+            if (b->b_type == SETUP_LOOP && why == WHY_BREAK) {
+                why = WHY_NOT;
+                JUMPTO(b->b_handler);
+                break;
+            }
+            if (why == WHY_EXCEPTION && (b->b_type == SETUP_EXCEPT
+                || b->b_type == SETUP_FINALLY)) {
                 PyObject *exc, *val, *tb;
                 int handler = b->b_handler;
                 _PyErr_StackItem *exc_info = tstate->exc_info;
@@ -4435,37 +4545,70 @@ exception_unwind:
                 PUSH(tb);
                 PUSH(val);
                 PUSH(exc);
+                why = WHY_NOT;
                 JUMPTO(handler);
-                /* Resume normal execution */
-                goto main_loop;
+                break;
+            }
+            if (b->b_type == SETUP_FINALLY) {
+                if (why & (WHY_RETURN | WHY_CONTINUE))
+                    PUSH(retval);
+                PUSH(PyLong_FromLong((long)why));
+                why = WHY_NOT;
+                JUMPTO(b->b_handler);
+                break;
             }
         } /* unwind stack */
 
-        /* End the loop as we still have an error */
-        break;
+        /* End the loop if we still have an error (or return) */
+
+        if (why != WHY_NOT)
+            break;
+
+        assert(!PyErr_Occurred());
+
     } /* main loop */
 
+    assert(why != WHY_YIELD);
     /* Pop remaining stack entries. */
     while (!EMPTY()) {
         PyObject *o = POP();
         Py_XDECREF(o);
     }
 
-    assert(retval == NULL);
-    assert(PyErr_Occurred());
+    if (why != WHY_RETURN)
+        retval = NULL;
+
+    assert((retval != NULL) ^ (PyErr_Occurred() != NULL));
 	
-return_or_yield:
+fast_yield:
+
     if (tstate->use_tracing) {
         if (tstate->c_tracefunc) {
-            if (call_trace_protected(tstate->c_tracefunc, tstate->c_traceobj,
-                                     tstate, f, PyTrace_RETURN, retval)) {
-                Py_CLEAR(retval);
+            if (why == WHY_RETURN || why == WHY_YIELD) {
+                if (call_trace(tstate->c_tracefunc, tstate->c_traceobj,
+                               tstate, f,
+                               PyTrace_RETURN, retval)) {
+                    Py_CLEAR(retval);
+                    why = WHY_EXCEPTION;
+                }
+            }
+            else if (why == WHY_EXCEPTION) {
+                call_trace_protected(tstate->c_tracefunc, tstate->c_traceobj,
+                                     tstate, f,
+                                     PyTrace_RETURN, NULL);
             }
         }
         if (tstate->c_profilefunc) {
-            if (call_trace_protected(tstate->c_profilefunc, tstate->c_profileobj,
-                                     tstate, f, PyTrace_RETURN, retval)) {
+            if (why == WHY_EXCEPTION)
+                call_trace_protected(tstate->c_profilefunc,
+                                     tstate->c_profileobj,
+                                     tstate, f,
+                                     PyTrace_RETURN, NULL);
+            else if (call_trace(tstate->c_profilefunc, tstate->c_profileobj,
+                                tstate, f,
+                                PyTrace_RETURN, retval)) {
                 Py_CLEAR(retval);
+                /* why = WHY_EXCEPTION; useless yet but cause compiler warnings */
             }
         }
     }
