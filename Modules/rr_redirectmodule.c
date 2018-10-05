@@ -53,12 +53,12 @@ static PyTypeObject RRStdFileRedirect_Type;
 static RRStdFileRedirectObject *
 newRRStdFileRedirectObject(PyObject *args)
 {
-	long long cbwrite, cbflush;
+	void * cbwrite, * cbflush;
 
 	//	Docs on format string -
 	//	https://docs.python.org/3/c-api/arg.html?highlight=pyarg_parsetuple#parsing-arguments
 
-	if ( ! PyArg_ParseTuple ( args, "LL:new", &cbwrite, &cbflush ) )
+	if ( ! PyArg_ParseTuple ( args, "OO:new", &cbwrite, &cbflush ) )
 		return NULL;
 
 	RRStdFileRedirectObject *self;
