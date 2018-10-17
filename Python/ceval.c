@@ -3960,6 +3960,9 @@ main_loop:
            It is essential that any operation that fails must goto error
            and that all operation that succeed call [FAST_]DISPATCH() ! */
 		
+        TARGET(NOP)
+            FAST_DISPATCH();
+
         TARGET(LOAD_FAST) {
             PyObject *value = GETLOCAL(oparg);
             if (value == NULL) {
@@ -3995,7 +3998,171 @@ main_loop:
             PyObject *value = POP();
             Py_DECREF(value);
             FAST_DISPATCH();
-		}
+        }
+
+        TARGET(ROT_TWO) {
+            PyObject *top = TOP();
+            PyObject *second = SECOND();
+            SET_TOP(second);
+            SET_SECOND(top);
+            FAST_DISPATCH();
+        }
+
+        TARGET(ROT_THREE) {
+            PyObject *top = TOP();
+            PyObject *second = SECOND();
+            PyObject *third = THIRD();
+            SET_TOP(second);
+            SET_SECOND(third);
+            SET_THIRD(top);
+            FAST_DISPATCH();
+        }
+
+        TARGET(DUP_TOP) {
+            PyObject *top = TOP();
+            Py_INCREF(top);
+            PUSH(top);
+            FAST_DISPATCH();
+        }
+
+        TARGET(DUP_TOP_TWO) {
+            PyObject *top = TOP();
+            PyObject *second = SECOND();
+            Py_INCREF(top);
+            Py_INCREF(second);
+            STACKADJ(2);
+            SET_TOP(top);
+            SET_SECOND(second);
+            FAST_DISPATCH();
+        }
+
+        TARGET(UNARY_POSITIVE) {
+            PyObject *value = TOP();
+            PyObject *res = PyNumber_Positive(value);
+            Py_DECREF(value);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(UNARY_NEGATIVE) {
+            PyObject *value = TOP();
+            PyObject *res = PyNumber_Negative(value);
+            Py_DECREF(value);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(UNARY_NOT) {
+            PyObject *value = TOP();
+            int err = PyObject_IsTrue(value);
+            Py_DECREF(value);
+            if (err == 0) {
+                Py_INCREF(Py_True);
+                SET_TOP(Py_True);
+                DISPATCH();
+            }
+            else if (err > 0) {
+                Py_INCREF(Py_False);
+                SET_TOP(Py_False);
+                DISPATCH();
+            }
+            STACKADJ(-1);
+            goto error;
+        }
+
+        TARGET(UNARY_INVERT) {
+            PyObject *value = TOP();
+            PyObject *res = PyNumber_Invert(value);
+            Py_DECREF(value);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(BINARY_POWER) {
+            PyObject *exp = POP();
+            PyObject *base = TOP();
+            PyObject *res = PyNumber_Power(base, exp, Py_None);
+            Py_DECREF(base);
+            Py_DECREF(exp);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(BINARY_MULTIPLY) {
+            PyObject *right = POP();
+            PyObject *left = TOP();
+            PyObject *res = PyNumber_Multiply(left, right);
+            Py_DECREF(left);
+            Py_DECREF(right);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(BINARY_MATRIX_MULTIPLY) {
+            PyObject *right = POP();
+            PyObject *left = TOP();
+            PyObject *res = PyNumber_MatrixMultiply(left, right);
+            Py_DECREF(left);
+            Py_DECREF(right);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(BINARY_TRUE_DIVIDE) {
+            PyObject *divisor = POP();
+            PyObject *dividend = TOP();
+            PyObject *quotient = PyNumber_TrueDivide(dividend, divisor);
+            Py_DECREF(dividend);
+            Py_DECREF(divisor);
+            SET_TOP(quotient);
+            if (quotient == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(BINARY_FLOOR_DIVIDE) {
+            PyObject *divisor = POP();
+            PyObject *dividend = TOP();
+            PyObject *quotient = PyNumber_FloorDivide(dividend, divisor);
+            Py_DECREF(dividend);
+            Py_DECREF(divisor);
+            SET_TOP(quotient);
+            if (quotient == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(BINARY_MODULO) {
+            PyObject *divisor = POP();
+            PyObject *dividend = TOP();
+            PyObject *res;
+            if (PyUnicode_CheckExact(dividend) && (
+                  !PyUnicode_Check(divisor) || PyUnicode_CheckExact(divisor))) {
+              // fast path; string formatting, but not if the RHS is a str subclass
+              // (see issue28598)
+              res = PyUnicode_Format(dividend, divisor);
+            } else {
+              res = PyNumber_Remainder(dividend, divisor);
+            }
+            Py_DECREF(divisor);
+            Py_DECREF(dividend);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
 
         TARGET(BINARY_ADD) {
             PyObject *right = POP();
@@ -4023,6 +4190,349 @@ main_loop:
             DISPATCH();
         }
 
+        TARGET(BINARY_SUBTRACT) {
+            PyObject *right = POP();
+            PyObject *left = TOP();
+            PyObject *diff = PyNumber_Subtract(left, right);
+            Py_DECREF(right);
+            Py_DECREF(left);
+            SET_TOP(diff);
+            if (diff == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(BINARY_SUBSCR) {
+            PyObject *sub = POP();
+            PyObject *container = TOP();
+            PyObject *res = PyObject_GetItem(container, sub);
+            Py_DECREF(container);
+            Py_DECREF(sub);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(BINARY_LSHIFT) {
+            PyObject *right = POP();
+            PyObject *left = TOP();
+            PyObject *res = PyNumber_Lshift(left, right);
+            Py_DECREF(left);
+            Py_DECREF(right);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(BINARY_RSHIFT) {
+            PyObject *right = POP();
+            PyObject *left = TOP();
+            PyObject *res = PyNumber_Rshift(left, right);
+            Py_DECREF(left);
+            Py_DECREF(right);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(BINARY_AND) {
+            PyObject *right = POP();
+            PyObject *left = TOP();
+            PyObject *res = PyNumber_And(left, right);
+            Py_DECREF(left);
+            Py_DECREF(right);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(BINARY_XOR) {
+            PyObject *right = POP();
+            PyObject *left = TOP();
+            PyObject *res = PyNumber_Xor(left, right);
+            Py_DECREF(left);
+            Py_DECREF(right);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(BINARY_OR) {
+            PyObject *right = POP();
+            PyObject *left = TOP();
+            PyObject *res = PyNumber_Or(left, right);
+            Py_DECREF(left);
+            Py_DECREF(right);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(LIST_APPEND) {
+            PyObject *v = POP();
+            PyObject *list = PEEK(oparg);
+            int err;
+            err = PyList_Append(list, v);
+            Py_DECREF(v);
+            if (err != 0)
+                goto error;
+            PREDICT(JUMP_ABSOLUTE);
+            DISPATCH();
+        }
+
+        TARGET(SET_ADD) {
+            PyObject *v = POP();
+            PyObject *set = PEEK(oparg);
+            int err;
+            err = PySet_Add(set, v);
+            Py_DECREF(v);
+            if (err != 0)
+                goto error;
+            PREDICT(JUMP_ABSOLUTE);
+            DISPATCH();
+        }
+
+        TARGET(INPLACE_POWER) {
+            PyObject *exp = POP();
+            PyObject *base = TOP();
+            PyObject *res = PyNumber_InPlacePower(base, exp, Py_None);
+            Py_DECREF(base);
+            Py_DECREF(exp);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(INPLACE_MULTIPLY) {
+            PyObject *right = POP();
+            PyObject *left = TOP();
+            PyObject *res = PyNumber_InPlaceMultiply(left, right);
+            Py_DECREF(left);
+            Py_DECREF(right);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(INPLACE_MATRIX_MULTIPLY) {
+            PyObject *right = POP();
+            PyObject *left = TOP();
+            PyObject *res = PyNumber_InPlaceMatrixMultiply(left, right);
+            Py_DECREF(left);
+            Py_DECREF(right);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(INPLACE_TRUE_DIVIDE) {
+            PyObject *divisor = POP();
+            PyObject *dividend = TOP();
+            PyObject *quotient = PyNumber_InPlaceTrueDivide(dividend, divisor);
+            Py_DECREF(dividend);
+            Py_DECREF(divisor);
+            SET_TOP(quotient);
+            if (quotient == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(INPLACE_FLOOR_DIVIDE) {
+            PyObject *divisor = POP();
+            PyObject *dividend = TOP();
+            PyObject *quotient = PyNumber_InPlaceFloorDivide(dividend, divisor);
+            Py_DECREF(dividend);
+            Py_DECREF(divisor);
+            SET_TOP(quotient);
+            if (quotient == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(INPLACE_MODULO) {
+            PyObject *right = POP();
+            PyObject *left = TOP();
+            PyObject *mod = PyNumber_InPlaceRemainder(left, right);
+            Py_DECREF(left);
+            Py_DECREF(right);
+            SET_TOP(mod);
+            if (mod == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(INPLACE_ADD) {
+            PyObject *right = POP();
+            PyObject *left = TOP();
+            PyObject *sum;
+            if (PyUnicode_CheckExact(left) && PyUnicode_CheckExact(right)) {
+                sum = unicode_concatenate(left, right, f, next_instr);
+                /* unicode_concatenate consumed the ref to left */
+            }
+            else {
+                sum = PyNumber_InPlaceAdd(left, right);
+                Py_DECREF(left);
+            }
+            Py_DECREF(right);
+            SET_TOP(sum);
+            if (sum == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(INPLACE_SUBTRACT) {
+            PyObject *right = POP();
+            PyObject *left = TOP();
+            PyObject *diff = PyNumber_InPlaceSubtract(left, right);
+            Py_DECREF(left);
+            Py_DECREF(right);
+            SET_TOP(diff);
+            if (diff == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(INPLACE_LSHIFT) {
+            PyObject *right = POP();
+            PyObject *left = TOP();
+            PyObject *res = PyNumber_InPlaceLshift(left, right);
+            Py_DECREF(left);
+            Py_DECREF(right);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(INPLACE_RSHIFT) {
+            PyObject *right = POP();
+            PyObject *left = TOP();
+            PyObject *res = PyNumber_InPlaceRshift(left, right);
+            Py_DECREF(left);
+            Py_DECREF(right);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(INPLACE_AND) {
+            PyObject *right = POP();
+            PyObject *left = TOP();
+            PyObject *res = PyNumber_InPlaceAnd(left, right);
+            Py_DECREF(left);
+            Py_DECREF(right);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(INPLACE_XOR) {
+            PyObject *right = POP();
+            PyObject *left = TOP();
+            PyObject *res = PyNumber_InPlaceXor(left, right);
+            Py_DECREF(left);
+            Py_DECREF(right);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(INPLACE_OR) {
+            PyObject *right = POP();
+            PyObject *left = TOP();
+            PyObject *res = PyNumber_InPlaceOr(left, right);
+            Py_DECREF(left);
+            Py_DECREF(right);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(STORE_SUBSCR) {
+            PyObject *sub = TOP();
+            PyObject *container = SECOND();
+            PyObject *v = THIRD();
+            int err;
+            STACKADJ(-3);
+            /* container[sub] = v */
+            err = PyObject_SetItem(container, sub, v);
+            Py_DECREF(v);
+            Py_DECREF(container);
+            Py_DECREF(sub);
+            if (err != 0)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(DELETE_SUBSCR) {
+            PyObject *sub = TOP();
+            PyObject *container = SECOND();
+            int err;
+            STACKADJ(-2);
+            /* del container[sub] */
+            err = PyObject_DelItem(container, sub);
+            Py_DECREF(container);
+            Py_DECREF(sub);
+            if (err != 0)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(PRINT_EXPR) {
+            _Py_IDENTIFIER(displayhook);
+            PyObject *value = POP();
+            PyObject *hook = _PySys_GetObjectId(&PyId_displayhook);
+            PyObject *res;
+            if (hook == NULL) {
+                PyErr_SetString(PyExc_RuntimeError,
+                                "lost sys.displayhook");
+                Py_DECREF(value);
+                goto error;
+            }
+            res = PyObject_CallFunctionObjArgs(hook, value, NULL);
+            Py_DECREF(value);
+            if (res == NULL)
+                goto error;
+            Py_DECREF(res);
+            DISPATCH();
+        }
+
+        TARGET(RAISE_VARARGS) {
+            PyObject *cause = NULL, *exc = NULL;
+            switch (oparg) {
+            case 2:
+                cause = POP(); /* cause */
+                /* fall through */
+            case 1:
+                exc = POP(); /* exc */
+                /* fall through */
+            case 0:
+                if (do_raise(exc, cause)) {
+                    why = WHY_EXCEPTION;
+                    goto fast_block_end;
+                }
+                break;
+            default:
+                PyErr_SetString(PyExc_SystemError,
+                           "bad RAISE_VARARGS oparg");
+                break;
+            }
+            goto error;
+        }
+
         TARGET(RETURN_VALUE) {
             retval = POP();
             why = WHY_RETURN;
@@ -4034,10 +4544,250 @@ main_loop:
             goto fast_yield;
         }
 
+        TARGET(GET_AITER) {
+            unaryfunc getter = NULL;
+            PyObject *iter = NULL;
+            PyObject *obj = TOP();
+            PyTypeObject *type = Py_TYPE(obj);
+
+            if (type->tp_as_async != NULL) {
+                getter = type->tp_as_async->am_aiter;
+            }
+
+            if (getter != NULL) {
+                iter = (*getter)(obj);
+                Py_DECREF(obj);
+                if (iter == NULL) {
+                    SET_TOP(NULL);
+                    goto error;
+                }
+            }
+            else {
+                SET_TOP(NULL);
+                PyErr_Format(
+                    PyExc_TypeError,
+                    "'async for' requires an object with "
+                    "__aiter__ method, got %.100s",
+                    type->tp_name);
+                Py_DECREF(obj);
+                goto error;
+            }
+
+            if (Py_TYPE(iter)->tp_as_async == NULL ||
+                    Py_TYPE(iter)->tp_as_async->am_anext == NULL) {
+
+                SET_TOP(NULL);
+                PyErr_Format(
+                    PyExc_TypeError,
+                    "'async for' received an object from __aiter__ "
+                    "that does not implement __anext__: %.100s",
+                    Py_TYPE(iter)->tp_name);
+                Py_DECREF(iter);
+                goto error;
+            }
+
+            SET_TOP(iter);
+            DISPATCH();
+        }
+
+        TARGET(GET_ANEXT) {
+            unaryfunc getter = NULL;
+            PyObject *next_iter = NULL;
+            PyObject *awaitable = NULL;
+            PyObject *aiter = TOP();
+            PyTypeObject *type = Py_TYPE(aiter);
+
+            if (PyAsyncGen_CheckExact(aiter)) {
+                awaitable = type->tp_as_async->am_anext(aiter);
+                if (awaitable == NULL) {
+                    goto error;
+                }
+            } else {
+                if (type->tp_as_async != NULL){
+                    getter = type->tp_as_async->am_anext;
+                }
+
+                if (getter != NULL) {
+                    next_iter = (*getter)(aiter);
+                    if (next_iter == NULL) {
+                        goto error;
+                    }
+                }
+                else {
+                    PyErr_Format(
+                        PyExc_TypeError,
+                        "'async for' requires an iterator with "
+                        "__anext__ method, got %.100s",
+                        type->tp_name);
+                    goto error;
+                }
+
+                awaitable = _PyCoro_GetAwaitableIter(next_iter);
+                if (awaitable == NULL) {
+                    _PyErr_FormatFromCause(
+                        PyExc_TypeError,
+                        "'async for' received an invalid object "
+                        "from __anext__: %.100s",
+                        Py_TYPE(next_iter)->tp_name);
+
+                    Py_DECREF(next_iter);
+                    goto error;
+                } else {
+                    Py_DECREF(next_iter);
+                }
+            }
+
+            PUSH(awaitable);
+            PREDICT(LOAD_CONST);
+            DISPATCH();
+        }
+
+        PREDICTED(GET_AWAITABLE);
+        TARGET(GET_AWAITABLE) {
+            PyObject *iterable = TOP();
+            PyObject *iter = _PyCoro_GetAwaitableIter(iterable);
+
+            if (iter == NULL) {
+                format_awaitable_error(Py_TYPE(iterable),
+                                       _Py_OPCODE(next_instr[-2]));
+            }
+
+            Py_DECREF(iterable);
+
+            if (iter != NULL && PyCoro_CheckExact(iter)) {
+                PyObject *yf = _PyGen_yf((PyGenObject*)iter);
+                if (yf != NULL) {
+                    /* `iter` is a coroutine object that is being
+                       awaited, `yf` is a pointer to the current awaitable
+                       being awaited on. */
+                    Py_DECREF(yf);
+                    Py_CLEAR(iter);
+                    PyErr_SetString(
+                        PyExc_RuntimeError,
+                        "coroutine is being awaited already");
+                    /* The code below jumps to `error` if `iter` is NULL. */
+                }
+            }
+
+            SET_TOP(iter); /* Even if it's NULL */
+
+            if (iter == NULL) {
+                goto error;
+            }
+
+            PREDICT(LOAD_CONST);
+            DISPATCH();
+        }
+
+        TARGET(YIELD_FROM) {
+            PyObject *v = POP();
+            PyObject *receiver = TOP();
+            int err;
+            if (PyGen_CheckExact(receiver) || PyCoro_CheckExact(receiver)) {
+                retval = _PyGen_Send((PyGenObject *)receiver, v);
+            } else {
+                _Py_IDENTIFIER(send);
+                if (v == Py_None)
+                    retval = Py_TYPE(receiver)->tp_iternext(receiver);
+                else
+                    retval = _PyObject_CallMethodIdObjArgs(receiver, &PyId_send, v, NULL);
+            }
+            Py_DECREF(v);
+            if (retval == NULL) {
+                PyObject *val;
+                if (tstate->c_tracefunc != NULL
+                        && PyErr_ExceptionMatches(PyExc_StopIteration))
+                    call_exc_trace(tstate->c_tracefunc, tstate->c_traceobj, tstate, f);
+                err = _PyGen_FetchStopIterationValue(&val);
+                if (err < 0)
+                    goto error;
+                Py_DECREF(receiver);
+                SET_TOP(val);
+                DISPATCH();
+            }
+            /* receiver remains on stack, retval is value to be yielded */
+            f->f_stacktop = stack_pointer;
+            why = WHY_YIELD;
+            /* and repeat... */
+            assert(f->f_lasti >= (int)sizeof(_Py_CODEUNIT));
+            f->f_lasti -= sizeof(_Py_CODEUNIT);
+            goto fast_yield;
+        }
+
+        TARGET(YIELD_VALUE) {
+            retval = POP();
+
+            if (co->co_flags & CO_ASYNC_GENERATOR) {
+                PyObject *w = _PyAsyncGenValueWrapperNew(retval);
+                Py_DECREF(retval);
+                if (w == NULL) {
+                    retval = NULL;
+                    goto error;
+                }
+                retval = w;
+            }
+
+            f->f_stacktop = stack_pointer;
+            why = WHY_YIELD;
+            goto fast_yield;
+        }
+
+        TARGET(POP_EXCEPT) {
+            PyTryBlock *b = PyFrame_BlockPop(f);
+            if (b->b_type != EXCEPT_HANDLER) {
+                PyErr_SetString(PyExc_SystemError,
+                                "popped block is not an except handler");
+                goto error;
+            }
+            UNWIND_EXCEPT_HANDLER(b);
+            DISPATCH();
+        }
+
         PREDICTED(POP_BLOCK);
         TARGET(POP_BLOCK) {
             PyTryBlock *b = PyFrame_BlockPop(f);
             UNWIND_BLOCK(b);
+            DISPATCH();
+        }
+
+        PREDICTED(END_FINALLY);
+        TARGET(END_FINALLY) {
+            PyObject *status = POP();
+            if (PyLong_Check(status)) {
+                why = (enum why_code) PyLong_AS_LONG(status);
+                assert(why != WHY_YIELD && why != WHY_EXCEPTION);
+                if (why == WHY_RETURN ||
+                    why == WHY_CONTINUE)
+                    retval = POP();
+                if (why == WHY_SILENCED) {
+                    /* An exception was silenced by 'with', we must
+                    manually unwind the EXCEPT_HANDLER block which was
+                    created when the exception was caught, otherwise
+                    the stack will be in an inconsistent state. */
+                    PyTryBlock *b = PyFrame_BlockPop(f);
+                    assert(b->b_type == EXCEPT_HANDLER);
+                    UNWIND_EXCEPT_HANDLER(b);
+                    why = WHY_NOT;
+                    Py_DECREF(status);
+                    DISPATCH();
+                }
+                Py_DECREF(status);
+                goto fast_block_end;
+            }
+            else if (PyExceptionClass_Check(status)) {
+                PyObject *exc = POP();
+                PyObject *tb = POP();
+                PyErr_Restore(status, exc, tb);
+                why = WHY_EXCEPTION;
+                goto fast_block_end;
+            }
+            else if (status != Py_None) {
+                PyErr_SetString(PyExc_SystemError,
+                    "'finally' pops bad exception");
+                Py_DECREF(status);
+                goto error;
+            }
+            Py_DECREF(status);
             DISPATCH();
         }
 
@@ -4091,6 +4841,25 @@ main_loop:
             DISPATCH();
         }
 
+        TARGET(DELETE_NAME) {
+            PyObject *name = GETITEM(names, oparg);
+            PyObject *ns = f->f_locals;
+            int err;
+            if (ns == NULL) {
+                PyErr_Format(PyExc_SystemError,
+                             "no locals when deleting %R", name);
+                goto error;
+            }
+            err = PyObject_DelItem(ns, name);
+            if (err != 0) {
+                format_exc_check_arg(PyExc_NameError,
+                                     NAME_ERROR_MSG,
+                                     name);
+                goto error;
+            }
+            DISPATCH();
+        }
+
         PREDICTED(UNPACK_SEQUENCE);
         TARGET(UNPACK_SEQUENCE) {
             PyObject *seq = POP(), *item, **items;
@@ -4115,6 +4884,21 @@ main_loop:
                 STACKADJ(oparg);
             } else {
                 /* unpack_iterable() raised an exception */
+                Py_DECREF(seq);
+                goto error;
+            }
+            Py_DECREF(seq);
+            DISPATCH();
+        }
+
+        TARGET(UNPACK_EX) {
+            int totalargs = 1 + (oparg & 0xFF) + (oparg >> 8);
+            PyObject *seq = POP();
+
+            if (unpack_iterable(seq, oparg & 0xFF, oparg >> 8,
+                                stack_pointer + totalargs)) {
+                stack_pointer += totalargs;
+            } else {
                 Py_DECREF(seq);
                 goto error;
             }
@@ -4164,6 +4948,17 @@ main_loop:
             DISPATCH();
         }
 
+        TARGET(DELETE_ATTR) {
+            PyObject *name = GETITEM(names, oparg);
+            PyObject *owner = POP();
+            int err;
+            err = PyObject_SetAttr(owner, name, (PyObject *)NULL);
+            Py_DECREF(owner);
+            if (err != 0)
+                goto error;
+            DISPATCH();
+        }
+
         TARGET(STORE_GLOBAL) {
             PyObject *name = GETITEM(names, oparg);
             PyObject *v = POP();
@@ -4172,6 +4967,18 @@ main_loop:
             Py_DECREF(v);
             if (err != 0)
                 goto error;
+            DISPATCH();
+        }
+
+        TARGET(DELETE_GLOBAL) {
+            PyObject *name = GETITEM(names, oparg);
+            int err;
+            err = PyDict_DelItem(f->f_globals, name);
+            if (err != 0) {
+                format_exc_check_arg(
+                    PyExc_NameError, NAME_ERROR_MSG, name);
+                goto error;
+            }
             DISPATCH();
         }
 
@@ -4271,6 +5078,123 @@ main_loop:
             DISPATCH();
         }
 
+        TARGET(DELETE_FAST) {
+            PyObject *v = GETLOCAL(oparg);
+            if (v != NULL) {
+                SETLOCAL(oparg, NULL);
+                DISPATCH();
+            }
+            format_exc_check_arg(
+                PyExc_UnboundLocalError,
+                UNBOUNDLOCAL_ERROR_MSG,
+                PyTuple_GetItem(co->co_varnames, oparg)
+                );
+            goto error;
+        }
+
+        TARGET(DELETE_DEREF) {
+            PyObject *cell = freevars[oparg];
+            PyObject *oldobj = PyCell_GET(cell);
+            if (oldobj != NULL) {
+                PyCell_SET(cell, NULL);
+                Py_DECREF(oldobj);
+                DISPATCH();
+            }
+            format_exc_unbound(co, oparg);
+            goto error;
+        }
+
+        TARGET(LOAD_CLOSURE) {
+            PyObject *cell = freevars[oparg];
+            Py_INCREF(cell);
+            PUSH(cell);
+            DISPATCH();
+        }
+
+        TARGET(LOAD_CLASSDEREF) {
+            PyObject *name, *value, *locals = f->f_locals;
+            Py_ssize_t idx;
+            assert(locals);
+            assert(oparg >= PyTuple_GET_SIZE(co->co_cellvars));
+            idx = oparg - PyTuple_GET_SIZE(co->co_cellvars);
+            assert(idx >= 0 && idx < PyTuple_GET_SIZE(co->co_freevars));
+            name = PyTuple_GET_ITEM(co->co_freevars, idx);
+            if (PyDict_CheckExact(locals)) {
+                value = PyDict_GetItem(locals, name);
+                Py_XINCREF(value);
+            }
+            else {
+                value = PyObject_GetItem(locals, name);
+                if (value == NULL) {
+                    if (!PyErr_ExceptionMatches(PyExc_KeyError))
+                        goto error;
+                    PyErr_Clear();
+                }
+            }
+            if (!value) {
+                PyObject *cell = freevars[oparg];
+                value = PyCell_GET(cell);
+                if (value == NULL) {
+                    format_exc_unbound(co, oparg);
+                    goto error;
+                }
+                Py_INCREF(value);
+            }
+            PUSH(value);
+            DISPATCH();
+        }
+
+        TARGET(LOAD_DEREF) {
+            PyObject *cell = freevars[oparg];
+            PyObject *value = PyCell_GET(cell);
+            if (value == NULL) {
+                format_exc_unbound(co, oparg);
+                goto error;
+            }
+            Py_INCREF(value);
+            PUSH(value);
+            DISPATCH();
+        }
+
+        TARGET(STORE_DEREF) {
+            PyObject *v = POP();
+            PyObject *cell = freevars[oparg];
+            PyObject *oldobj = PyCell_GET(cell);
+            PyCell_SET(cell, v);
+            Py_XDECREF(oldobj);
+            DISPATCH();
+        }
+
+        TARGET(BUILD_STRING) {
+            PyObject *str;
+            PyObject *empty = PyUnicode_New(0, 0);
+            if (empty == NULL) {
+                goto error;
+            }
+            str = _PyUnicode_JoinArray(empty, stack_pointer - oparg, oparg);
+            Py_DECREF(empty);
+            if (str == NULL)
+                goto error;
+            while (--oparg >= 0) {
+                PyObject *item = POP();
+                Py_DECREF(item);
+            }
+            PUSH(str);
+            DISPATCH();
+        }
+
+        TARGET(BUILD_TUPLE) {
+            PyObject *tup = PyTuple_New(oparg);
+            if (tup == NULL)
+                goto error;
+            while (--oparg >= 0) {
+                PyObject *item = POP();
+                PyTuple_SET_ITEM(tup, oparg, item);
+            }
+            PUSH(tup);
+            DISPATCH();
+        }
+
         TARGET(BUILD_LIST) {
             PyObject *list =  PyList_New(oparg);
             if (list == NULL)
@@ -4280,6 +5204,294 @@ main_loop:
                 PyList_SET_ITEM(list, oparg, item);
             }
             PUSH(list);
+            DISPATCH();
+        }
+
+        TARGET(BUILD_TUPLE_UNPACK_WITH_CALL)
+        TARGET(BUILD_TUPLE_UNPACK)
+        TARGET(BUILD_LIST_UNPACK) {
+            int convert_to_tuple = opcode != BUILD_LIST_UNPACK;
+            Py_ssize_t i;
+            PyObject *sum = PyList_New(0);
+            PyObject *return_value;
+
+            if (sum == NULL)
+                goto error;
+
+            for (i = oparg; i > 0; i--) {
+                PyObject *none_val;
+
+                none_val = _PyList_Extend((PyListObject *)sum, PEEK(i));
+                if (none_val == NULL) {
+                    if (opcode == BUILD_TUPLE_UNPACK_WITH_CALL &&
+                        PyErr_ExceptionMatches(PyExc_TypeError))
+                    {
+                        check_args_iterable(PEEK(1 + oparg), PEEK(i));
+                    }
+                    Py_DECREF(sum);
+                    goto error;
+                }
+                Py_DECREF(none_val);
+            }
+
+            if (convert_to_tuple) {
+                return_value = PyList_AsTuple(sum);
+                Py_DECREF(sum);
+                if (return_value == NULL)
+                    goto error;
+            }
+            else {
+                return_value = sum;
+            }
+
+            while (oparg--)
+                Py_DECREF(POP());
+            PUSH(return_value);
+            DISPATCH();
+        }
+
+        TARGET(BUILD_SET) {
+            PyObject *set = PySet_New(NULL);
+            int err = 0;
+            int i;
+            if (set == NULL)
+                goto error;
+            for (i = oparg; i > 0; i--) {
+                PyObject *item = PEEK(i);
+                if (err == 0)
+                    err = PySet_Add(set, item);
+                Py_DECREF(item);
+            }
+            STACKADJ(-oparg);
+            if (err != 0) {
+                Py_DECREF(set);
+                goto error;
+            }
+            PUSH(set);
+            DISPATCH();
+        }
+
+        TARGET(BUILD_SET_UNPACK) {
+            Py_ssize_t i;
+            PyObject *sum = PySet_New(NULL);
+            if (sum == NULL)
+                goto error;
+
+            for (i = oparg; i > 0; i--) {
+                if (_PySet_Update(sum, PEEK(i)) < 0) {
+                    Py_DECREF(sum);
+                    goto error;
+                }
+            }
+
+            while (oparg--)
+                Py_DECREF(POP());
+            PUSH(sum);
+            DISPATCH();
+        }
+
+        TARGET(BUILD_MAP) {
+            Py_ssize_t i;
+            PyObject *map = _PyDict_NewPresized((Py_ssize_t)oparg);
+            if (map == NULL)
+                goto error;
+            for (i = oparg; i > 0; i--) {
+                int err;
+                PyObject *key = PEEK(2*i);
+                PyObject *value = PEEK(2*i - 1);
+                err = PyDict_SetItem(map, key, value);
+                if (err != 0) {
+                    Py_DECREF(map);
+                    goto error;
+                }
+            }
+
+            while (oparg--) {
+                Py_DECREF(POP());
+                Py_DECREF(POP());
+            }
+            PUSH(map);
+            DISPATCH();
+        }
+
+        TARGET(SETUP_ANNOTATIONS) {
+            _Py_IDENTIFIER(__annotations__);
+            int err;
+            PyObject *ann_dict;
+            if (f->f_locals == NULL) {
+                PyErr_Format(PyExc_SystemError,
+                             "no locals found when setting up annotations");
+                goto error;
+            }
+            /* check if __annotations__ in locals()... */
+            if (PyDict_CheckExact(f->f_locals)) {
+                ann_dict = _PyDict_GetItemId(f->f_locals,
+                                             &PyId___annotations__);
+                if (ann_dict == NULL) {
+                    /* ...if not, create a new one */
+                    ann_dict = PyDict_New();
+                    if (ann_dict == NULL) {
+                        goto error;
+                    }
+                    err = _PyDict_SetItemId(f->f_locals,
+                                            &PyId___annotations__, ann_dict);
+                    Py_DECREF(ann_dict);
+                    if (err != 0) {
+                        goto error;
+                    }
+                }
+            }
+            else {
+                /* do the same if locals() is not a dict */
+                PyObject *ann_str = _PyUnicode_FromId(&PyId___annotations__);
+                if (ann_str == NULL) {
+                    goto error;
+                }
+                ann_dict = PyObject_GetItem(f->f_locals, ann_str);
+                if (ann_dict == NULL) {
+                    if (!PyErr_ExceptionMatches(PyExc_KeyError)) {
+                        goto error;
+                    }
+                    PyErr_Clear();
+                    ann_dict = PyDict_New();
+                    if (ann_dict == NULL) {
+                        goto error;
+                    }
+                    err = PyObject_SetItem(f->f_locals, ann_str, ann_dict);
+                    Py_DECREF(ann_dict);
+                    if (err != 0) {
+                        goto error;
+                    }
+                }
+                else {
+                    Py_DECREF(ann_dict);
+                }
+            }
+            DISPATCH();
+        }
+
+        TARGET(BUILD_CONST_KEY_MAP) {
+            Py_ssize_t i;
+            PyObject *map;
+            PyObject *keys = TOP();
+            if (!PyTuple_CheckExact(keys) ||
+                PyTuple_GET_SIZE(keys) != (Py_ssize_t)oparg) {
+                PyErr_SetString(PyExc_SystemError,
+                                "bad BUILD_CONST_KEY_MAP keys argument");
+                goto error;
+            }
+            map = _PyDict_NewPresized((Py_ssize_t)oparg);
+            if (map == NULL) {
+                goto error;
+            }
+            for (i = oparg; i > 0; i--) {
+                int err;
+                PyObject *key = PyTuple_GET_ITEM(keys, oparg - i);
+                PyObject *value = PEEK(i + 1);
+                err = PyDict_SetItem(map, key, value);
+                if (err != 0) {
+                    Py_DECREF(map);
+                    goto error;
+                }
+            }
+
+            Py_DECREF(POP());
+            while (oparg--) {
+                Py_DECREF(POP());
+            }
+            PUSH(map);
+            DISPATCH();
+        }
+
+        TARGET(BUILD_MAP_UNPACK) {
+            Py_ssize_t i;
+            PyObject *sum = PyDict_New();
+            if (sum == NULL)
+                goto error;
+
+            for (i = oparg; i > 0; i--) {
+                PyObject *arg = PEEK(i);
+                if (PyDict_Update(sum, arg) < 0) {
+                    if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
+                        PyErr_Format(PyExc_TypeError,
+                                "'%.200s' object is not a mapping",
+                                arg->ob_type->tp_name);
+                    }
+                    Py_DECREF(sum);
+                    goto error;
+                }
+            }
+
+            while (oparg--)
+                Py_DECREF(POP());
+            PUSH(sum);
+            DISPATCH();
+        }
+
+        TARGET(BUILD_MAP_UNPACK_WITH_CALL) {
+            Py_ssize_t i;
+            PyObject *sum = PyDict_New();
+            if (sum == NULL)
+                goto error;
+
+            for (i = oparg; i > 0; i--) {
+                PyObject *arg = PEEK(i);
+                if (_PyDict_MergeEx(sum, arg, 2) < 0) {
+                    PyObject *func = PEEK(2 + oparg);
+                    if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
+                        format_kwargs_mapping_error(func, arg);
+                    }
+                    else if (PyErr_ExceptionMatches(PyExc_KeyError)) {
+                        PyObject *exc, *val, *tb;
+                        PyErr_Fetch(&exc, &val, &tb);
+                        if (val && PyTuple_Check(val) && PyTuple_GET_SIZE(val) == 1) {
+                            PyObject *key = PyTuple_GET_ITEM(val, 0);
+                            if (!PyUnicode_Check(key)) {
+                                PyErr_Format(PyExc_TypeError,
+                                        "%.200s%.200s keywords must be strings",
+                                        PyEval_GetFuncName(func),
+                                        PyEval_GetFuncDesc(func));
+                            } else {
+                                PyErr_Format(PyExc_TypeError,
+                                        "%.200s%.200s got multiple "
+                                        "values for keyword argument '%U'",
+                                        PyEval_GetFuncName(func),
+                                        PyEval_GetFuncDesc(func),
+                                        key);
+                            }
+                            Py_XDECREF(exc);
+                            Py_XDECREF(val);
+                            Py_XDECREF(tb);
+                        }
+                        else {
+                            PyErr_Restore(exc, val, tb);
+                        }
+                    }
+                    Py_DECREF(sum);
+                    goto error;
+                }
+            }
+
+            while (oparg--)
+                Py_DECREF(POP());
+            PUSH(sum);
+            DISPATCH();
+        }
+
+        TARGET(MAP_ADD) {
+            PyObject *key = TOP();
+            PyObject *value = SECOND();
+            PyObject *map;
+            int err;
+            STACKADJ(-2);
+            map = PEEK(oparg);                      /* dict */
+            assert(PyDict_CheckExact(map));
+            err = PyDict_SetItem(map, key, value);  /* map[key] = value */
+            Py_DECREF(value);
+            Py_DECREF(key);
+            if (err != 0)
+                goto error;
+            PREDICT(JUMP_ABSOLUTE);
             DISPATCH();
         }
 
@@ -4294,6 +5506,20 @@ main_loop:
             DISPATCH();
         }
 
+        TARGET(COMPARE_OP) {
+            PyObject *right = POP();
+            PyObject *left = TOP();
+            PyObject *res = cmp_outcome(oparg, left, right);
+            Py_DECREF(left);
+            Py_DECREF(right);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            PREDICT(POP_JUMP_IF_FALSE);
+            PREDICT(POP_JUMP_IF_TRUE);
+            DISPATCH();
+        }
+
         TARGET(IMPORT_NAME) {
             PyObject *name = GETITEM(names, oparg);
             PyObject *fromlist = POP();
@@ -4304,6 +5530,143 @@ main_loop:
             Py_DECREF(fromlist);
             SET_TOP(res);
             if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(IMPORT_STAR) {
+            PyObject *from = POP(), *locals;
+            int err;
+            if (PyFrame_FastToLocalsWithError(f) < 0) {
+                Py_DECREF(from);
+                goto error;
+            }
+
+            locals = f->f_locals;
+            if (locals == NULL) {
+                PyErr_SetString(PyExc_SystemError,
+                    "no locals found during 'import *'");
+                Py_DECREF(from);
+                goto error;
+            }
+            err = import_all_from(locals, from);
+            PyFrame_LocalsToFast(f, 0);
+            Py_DECREF(from);
+            if (err != 0)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(IMPORT_FROM) {
+            PyObject *name = GETITEM(names, oparg);
+            PyObject *from = TOP();
+            PyObject *res;
+            res = import_from(from, name);
+            PUSH(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(JUMP_FORWARD) {
+            JUMPBY(oparg);
+            FAST_DISPATCH();
+        }
+
+        PREDICTED(POP_JUMP_IF_FALSE);
+        TARGET(POP_JUMP_IF_FALSE) {
+            PyObject *cond = POP();
+            int err;
+            if (cond == Py_True) {
+                Py_DECREF(cond);
+                FAST_DISPATCH();
+            }
+            if (cond == Py_False) {
+                Py_DECREF(cond);
+                JUMPTO(oparg);
+                FAST_DISPATCH();
+            }
+            err = PyObject_IsTrue(cond);
+            Py_DECREF(cond);
+            if (err > 0)
+                ;
+            else if (err == 0)
+                JUMPTO(oparg);
+            else
+                goto error;
+            DISPATCH();
+        }
+
+        PREDICTED(POP_JUMP_IF_TRUE);
+        TARGET(POP_JUMP_IF_TRUE) {
+            PyObject *cond = POP();
+            int err;
+            if (cond == Py_False) {
+                Py_DECREF(cond);
+                FAST_DISPATCH();
+            }
+            if (cond == Py_True) {
+                Py_DECREF(cond);
+                JUMPTO(oparg);
+                FAST_DISPATCH();
+            }
+            err = PyObject_IsTrue(cond);
+            Py_DECREF(cond);
+            if (err > 0) {
+                JUMPTO(oparg);
+            }
+            else if (err == 0)
+                ;
+            else
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(JUMP_IF_FALSE_OR_POP) {
+            PyObject *cond = TOP();
+            int err;
+            if (cond == Py_True) {
+                STACKADJ(-1);
+                Py_DECREF(cond);
+                FAST_DISPATCH();
+            }
+            if (cond == Py_False) {
+                JUMPTO(oparg);
+                FAST_DISPATCH();
+            }
+            err = PyObject_IsTrue(cond);
+            if (err > 0) {
+                STACKADJ(-1);
+                Py_DECREF(cond);
+            }
+            else if (err == 0)
+                JUMPTO(oparg);
+            else
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(JUMP_IF_TRUE_OR_POP) {
+            PyObject *cond = TOP();
+            int err;
+            if (cond == Py_False) {
+                STACKADJ(-1);
+                Py_DECREF(cond);
+                FAST_DISPATCH();
+            }
+            if (cond == Py_True) {
+                JUMPTO(oparg);
+                FAST_DISPATCH();
+            }
+            err = PyObject_IsTrue(cond);
+            if (err > 0) {
+                JUMPTO(oparg);
+            }
+            else if (err == 0) {
+                STACKADJ(-1);
+                Py_DECREF(cond);
+            }
+            else
                 goto error;
             DISPATCH();
         }
@@ -4323,6 +5686,48 @@ main_loop:
 #else
             DISPATCH();
 #endif
+        }
+
+        TARGET(GET_ITER) {
+            /* before: [obj]; after [getiter(obj)] */
+            PyObject *iterable = TOP();
+            PyObject *iter = PyObject_GetIter(iterable);
+            Py_DECREF(iterable);
+            SET_TOP(iter);
+            if (iter == NULL)
+                goto error;
+            PREDICT(FOR_ITER);
+            PREDICT(CALL_FUNCTION);
+            DISPATCH();
+        }
+
+        TARGET(GET_YIELD_FROM_ITER) {
+            /* before: [obj]; after [getiter(obj)] */
+            PyObject *iterable = TOP();
+            PyObject *iter;
+            if (PyCoro_CheckExact(iterable)) {
+                /* `iterable` is a coroutine */
+                if (!(co->co_flags & (CO_COROUTINE | CO_ITERABLE_COROUTINE))) {
+                    /* and it is used in a 'yield from' expression of a
+                       regular generator. */
+                    Py_DECREF(iterable);
+                    SET_TOP(NULL);
+                    PyErr_SetString(PyExc_TypeError,
+                                    "cannot 'yield from' a coroutine object "
+                                    "in a non-coroutine generator");
+                    goto error;
+                }
+            }
+            else if (!PyGen_CheckExact(iterable)) {
+                /* `iterable` is not a generator. */
+                iter = PyObject_GetIter(iterable);
+                Py_DECREF(iterable);
+                SET_TOP(iter);
+                if (iter == NULL)
+                    goto error;
+            }
+            PREDICT(LOAD_CONST);
+            DISPATCH();
         }
 
         PREDICTED(FOR_ITER);
@@ -4354,17 +5759,17 @@ main_loop:
             DISPATCH();
         }
 
-        TARGET(GET_ITER) {
-            /* before: [obj]; after [getiter(obj)] */
-            PyObject *iterable = TOP();
-            PyObject *iter = PyObject_GetIter(iterable);
-            Py_DECREF(iterable);
-            SET_TOP(iter);
-            if (iter == NULL)
+        TARGET(BREAK_LOOP) {
+            why = WHY_BREAK;
+            goto fast_block_end;
+        }
+
+        TARGET(CONTINUE_LOOP) {
+            retval = PyLong_FromLong(oparg);
+            if (retval == NULL)
                 goto error;
-            PREDICT(FOR_ITER);
-            PREDICT(CALL_FUNCTION);
-            DISPATCH();
+            why = WHY_CONTINUE;
+            goto fast_block_end;
         }
 
         TARGET(SETUP_LOOP)
@@ -4377,6 +5782,269 @@ main_loop:
 
             PyFrame_BlockSetup(f, opcode, INSTR_OFFSET() + oparg,
                                STACK_LEVEL());
+            DISPATCH();
+        }
+
+        TARGET(BEFORE_ASYNC_WITH) {
+            _Py_IDENTIFIER(__aexit__);
+            _Py_IDENTIFIER(__aenter__);
+
+            PyObject *mgr = TOP();
+            PyObject *exit = special_lookup(mgr, &PyId___aexit__),
+                     *enter;
+            PyObject *res;
+            if (exit == NULL)
+                goto error;
+            SET_TOP(exit);
+            enter = special_lookup(mgr, &PyId___aenter__);
+            Py_DECREF(mgr);
+            if (enter == NULL)
+                goto error;
+            res = _PyObject_CallNoArg(enter);
+            Py_DECREF(enter);
+            if (res == NULL)
+                goto error;
+            PUSH(res);
+            PREDICT(GET_AWAITABLE);
+            DISPATCH();
+        }
+
+        TARGET(SETUP_ASYNC_WITH) {
+            PyObject *res = POP();
+            /* Setup the finally block before pushing the result
+               of __aenter__ on the stack. */
+            PyFrame_BlockSetup(f, SETUP_FINALLY, INSTR_OFFSET() + oparg,
+                               STACK_LEVEL());
+            PUSH(res);
+            DISPATCH();
+        }
+
+        TARGET(SETUP_WITH) {
+            _Py_IDENTIFIER(__exit__);
+            _Py_IDENTIFIER(__enter__);
+            PyObject *mgr = TOP();
+            PyObject *enter = special_lookup(mgr, &PyId___enter__), *exit;
+            PyObject *res;
+            if (enter == NULL)
+                goto error;
+            exit = special_lookup(mgr, &PyId___exit__);
+            if (exit == NULL) {
+                Py_DECREF(enter);
+                goto error;
+            }
+            SET_TOP(exit);
+            Py_DECREF(mgr);
+            res = _PyObject_CallNoArg(enter);
+            Py_DECREF(enter);
+            if (res == NULL)
+                goto error;
+            /* Setup the finally block before pushing the result
+               of __enter__ on the stack. */
+            PyFrame_BlockSetup(f, SETUP_FINALLY, INSTR_OFFSET() + oparg,
+                               STACK_LEVEL());
+
+            PUSH(res);
+            DISPATCH();
+        }
+
+        TARGET(WITH_CLEANUP_START) {
+            /* At the top of the stack are 1-6 values indicating
+               how/why we entered the finally clause:
+               - TOP = None
+               - (TOP, SECOND) = (WHY_{RETURN,CONTINUE}), retval
+               - TOP = WHY_*; no retval below it
+               - (TOP, SECOND, THIRD) = exc_info()
+                 (FOURTH, FITH, SIXTH) = previous exception for EXCEPT_HANDLER
+               Below them is EXIT, the context.__exit__ bound method.
+               In the last case, we must call
+                 EXIT(TOP, SECOND, THIRD)
+               otherwise we must call
+                 EXIT(None, None, None)
+
+               In the first three cases, we remove EXIT from the
+               stack, leaving the rest in the same order.  In the
+               fourth case, we shift the bottom 3 values of the
+               stack down, and replace the empty spot with NULL.
+
+               In addition, if the stack represents an exception,
+               *and* the function call returns a 'true' value, we
+               push WHY_SILENCED onto the stack.  END_FINALLY will
+               then not re-raise the exception.  (But non-local
+               gotos should still be resumed.)
+            */
+
+            PyObject* stack[3];
+            PyObject *exit_func;
+            PyObject *exc, *val, *tb, *res;
+
+            val = tb = Py_None;
+            exc = TOP();
+            if (exc == Py_None) {
+                (void)POP();
+                exit_func = TOP();
+                SET_TOP(exc);
+            }
+            else if (PyLong_Check(exc)) {
+                STACKADJ(-1);
+                switch (PyLong_AsLong(exc)) {
+                case WHY_RETURN:
+                case WHY_CONTINUE:
+                    /* Retval in TOP. */
+                    exit_func = SECOND();
+                    SET_SECOND(TOP());
+                    SET_TOP(exc);
+                    break;
+                default:
+                    exit_func = TOP();
+                    SET_TOP(exc);
+                    break;
+                }
+                exc = Py_None;
+            }
+            else {
+                PyObject *tp2, *exc2, *tb2;
+                PyTryBlock *block;
+                val = SECOND();
+                tb = THIRD();
+                tp2 = FOURTH();
+                exc2 = PEEK(5);
+                tb2 = PEEK(6);
+                exit_func = PEEK(7);
+                SET_VALUE(7, tb2);
+                SET_VALUE(6, exc2);
+                SET_VALUE(5, tp2);
+                /* UNWIND_EXCEPT_HANDLER will pop this off. */
+                SET_FOURTH(NULL);
+                /* We just shifted the stack down, so we have
+                   to tell the except handler block that the
+                   values are lower than it expects. */
+                block = &f->f_blockstack[f->f_iblock - 1];
+                assert(block->b_type == EXCEPT_HANDLER);
+                block->b_level--;
+            }
+
+            stack[0] = exc;
+            stack[1] = val;
+            stack[2] = tb;
+            res = _PyObject_FastCall(exit_func, stack, 3);
+            Py_DECREF(exit_func);
+            if (res == NULL)
+                goto error;
+
+            Py_INCREF(exc); /* Duplicating the exception on the stack */
+            PUSH(exc);
+            PUSH(res);
+            PREDICT(WITH_CLEANUP_FINISH);
+            DISPATCH();
+        }
+
+        PREDICTED(WITH_CLEANUP_FINISH);
+        TARGET(WITH_CLEANUP_FINISH) {
+            PyObject *res = POP();
+            PyObject *exc = POP();
+            int err;
+
+            if (exc != Py_None)
+                err = PyObject_IsTrue(res);
+            else
+                err = 0;
+
+            Py_DECREF(res);
+            Py_DECREF(exc);
+
+            if (err < 0)
+                goto error;
+            else if (err > 0) {
+                /* There was an exception and a True return */
+                PUSH(PyLong_FromLong((long) WHY_SILENCED));
+            }
+            PREDICT(END_FINALLY);
+            DISPATCH();
+        }
+
+        TARGET(LOAD_METHOD) {
+            /* Designed to work in tamdem with CALL_METHOD. */
+            PyObject *name = GETITEM(names, oparg);
+            PyObject *obj = TOP();
+            PyObject *meth = NULL;
+
+            int meth_found = _PyObject_GetMethod(obj, name, &meth);
+
+            if (meth == NULL) {
+                /* Most likely attribute wasn't found. */
+                goto error;
+            }
+
+            if (meth_found) {
+                /* We can bypass temporary bound method object.
+                   meth is unbound method and obj is self.
+
+                   meth | self | arg1 | ... | argN
+                 */
+                SET_TOP(meth);
+                PUSH(obj);  // self
+            }
+            else {
+                /* meth is not an unbound method (but a regular attr, or
+                   something was returned by a descriptor protocol).  Set
+                   the second element of the stack to NULL, to signal
+                   CALL_METHOD that it's not a method call.
+
+                   NULL | meth | arg1 | ... | argN
+                */
+                SET_TOP(NULL);
+                Py_DECREF(obj);
+                PUSH(meth);
+            }
+            DISPATCH();
+        }
+
+        TARGET(CALL_METHOD) {
+            /* Designed to work in tamdem with LOAD_METHOD. */
+            PyObject **sp, *res, *meth;
+
+            sp = stack_pointer;
+
+            meth = PEEK(oparg + 2);
+            if (meth == NULL) {
+                /* `meth` is NULL when LOAD_METHOD thinks that it's not
+                   a method call.
+
+                   Stack layout:
+
+                       ... | NULL | callable | arg1 | ... | argN
+                                                            ^- TOP()
+                                               ^- (-oparg)
+                                    ^- (-oparg-1)
+                             ^- (-oparg-2)
+
+                   `callable` will be POPed by call_function.
+                   NULL will will be POPed manually later.
+                */
+                res = call_function(&sp, oparg, NULL);
+                stack_pointer = sp;
+                (void)POP(); /* POP the NULL. */
+            }
+            else {
+                /* This is a method call.  Stack layout:
+
+                     ... | method | self | arg1 | ... | argN
+                                                        ^- TOP()
+                                           ^- (-oparg)
+                                    ^- (-oparg-1)
+                           ^- (-oparg-2)
+
+                  `self` and `method` will be POPed by call_function.
+                  We'll be passing `oparg + 1` to call_function, to
+                  make it accept the `self` as a first argument.
+                */
+                res = call_function(&sp, oparg + 1, NULL);
+                stack_pointer = sp;
+            }
+
+            PUSH(res);
+            if (res == NULL)
+                goto error;
             DISPATCH();
         }
 
@@ -4407,6 +6075,76 @@ main_loop:
             }
             DISPATCH();
 		}
+
+        TARGET(CALL_FUNCTION_KW) {
+            PyObject **sp, *res, *names;
+
+            names = POP();
+            assert(PyTuple_CheckExact(names) && PyTuple_GET_SIZE(names) <= oparg);
+            sp = stack_pointer;
+            res = call_function(&sp, oparg, names);
+            stack_pointer = sp;
+            PUSH(res);
+            Py_DECREF(names);
+
+            if (res == NULL) {
+                goto error;
+            }
+            DISPATCH();
+        }
+
+        TARGET(CALL_FUNCTION_EX) {
+            PyObject *func, *callargs, *kwargs = NULL, *result;
+            if (oparg & 0x01) {
+                kwargs = POP();
+                if (!PyDict_CheckExact(kwargs)) {
+                    PyObject *d = PyDict_New();
+                    if (d == NULL)
+                        goto error;
+                    if (PyDict_Update(d, kwargs) != 0) {
+                        Py_DECREF(d);
+                        /* PyDict_Update raises attribute
+                         * error (percolated from an attempt
+                         * to get 'keys' attribute) instead of
+                         * a type error if its second argument
+                         * is not a mapping.
+                         */
+                        if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
+                            format_kwargs_mapping_error(SECOND(), kwargs);
+                        }
+                        Py_DECREF(kwargs);
+                        goto error;
+                    }
+                    Py_DECREF(kwargs);
+                    kwargs = d;
+                }
+                assert(PyDict_CheckExact(kwargs));
+            }
+            callargs = POP();
+            func = TOP();
+            if (!PyTuple_CheckExact(callargs)) {
+                if (check_args_iterable(func, callargs) < 0) {
+                    Py_DECREF(callargs);
+                    goto error;
+                }
+                Py_SETREF(callargs, PySequence_Tuple(callargs));
+                if (callargs == NULL) {
+                    goto error;
+                }
+            }
+            assert(PyTuple_CheckExact(callargs));
+
+            result = do_call_core(func, callargs, kwargs);
+            Py_DECREF(func);
+            Py_DECREF(callargs);
+            Py_XDECREF(kwargs);
+
+            SET_TOP(result);
+            if (result == NULL) {
+                goto error;
+            }
+            DISPATCH();
+        }
 
         TARGET(MAKE_FUNCTION) {
             PyObject *qualname = POP();
@@ -4440,6 +6178,90 @@ main_loop:
             PUSH((PyObject *)func);
             DISPATCH();
         }
+
+        TARGET(BUILD_SLICE) {
+            PyObject *start, *stop, *step, *slice;
+            if (oparg == 3)
+                step = POP();
+            else
+                step = NULL;
+            stop = POP();
+            start = TOP();
+            slice = PySlice_New(start, stop, step);
+            Py_DECREF(start);
+            Py_DECREF(stop);
+            Py_XDECREF(step);
+            SET_TOP(slice);
+            if (slice == NULL)
+                goto error;
+            DISPATCH();
+        }
+
+        TARGET(FORMAT_VALUE) {
+            /* Handles f-string value formatting. */
+            PyObject *result;
+            PyObject *fmt_spec;
+            PyObject *value;
+            PyObject *(*conv_fn)(PyObject *);
+            int which_conversion = oparg & FVC_MASK;
+            int have_fmt_spec = (oparg & FVS_MASK) == FVS_HAVE_SPEC;
+
+            fmt_spec = have_fmt_spec ? POP() : NULL;
+            value = POP();
+
+            /* See if any conversion is specified. */
+            switch (which_conversion) {
+            case FVC_STR:   conv_fn = PyObject_Str;   break;
+            case FVC_REPR:  conv_fn = PyObject_Repr;  break;
+            case FVC_ASCII: conv_fn = PyObject_ASCII; break;
+
+            /* Must be 0 (meaning no conversion), since only four
+               values are allowed by (oparg & FVC_MASK). */
+            default:        conv_fn = NULL;           break;
+            }
+
+            /* If there's a conversion function, call it and replace
+               value with that result. Otherwise, just use value,
+               without conversion. */
+            if (conv_fn != NULL) {
+                result = conv_fn(value);
+                Py_DECREF(value);
+                if (result == NULL) {
+                    Py_XDECREF(fmt_spec);
+                    goto error;
+                }
+                value = result;
+            }
+
+            /* If value is a unicode object, and there's no fmt_spec,
+               then we know the result of format(value) is value
+               itself. In that case, skip calling format(). I plan to
+               move this optimization in to PyObject_Format()
+               itself. */
+            if (PyUnicode_CheckExact(value) && fmt_spec == NULL) {
+                /* Do nothing, just transfer ownership to result. */
+                result = value;
+            } else {
+                /* Actually call format(). */
+                result = PyObject_Format(value, fmt_spec);
+                Py_DECREF(value);
+                Py_XDECREF(fmt_spec);
+                if (result == NULL) {
+                    goto error;
+                }
+            }
+
+            PUSH(result);
+            DISPATCH();
+        }
+
+        TARGET(EXTENDED_ARG) {
+            int oldoparg = oparg;
+            NEXTOPARG();
+            oparg |= oldoparg << 8;
+            goto dispatch_opcode;
+        }
+
 
 #if USE_COMPUTED_GOTOS
         _unknown_opcode:

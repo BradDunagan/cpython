@@ -522,7 +522,11 @@ _PyMethodDef_RawFastCallDict(PyMethodDef *method, PyObject *self,
             result = (*(PyCFunctionWithKeywords)meth) (self, argstuple, kwargs);
         }
         else {
+        //  printf ( "bradds std _PyMethodDef_RawFastCallDict(): calling 0x%08X  \n", meth );
+
             result = (*meth) (self, argstuple);
+
+        //  printf ( "bradds std _PyMethodDef_RawFastCallDict(): result 0x%08X  sizeof(PyObject) %d  \n", result, sizeof(PyObject) );
         }
         Py_DECREF(argstuple);
         break;
@@ -535,6 +539,7 @@ _PyMethodDef_RawFastCallDict(PyMethodDef *method, PyObject *self,
         }
 
         result = (*(_PyCFunctionFast)meth) (self, args, nargs);
+
         break;
     }
 

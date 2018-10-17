@@ -39,6 +39,14 @@ static PyObject *ErrorObject;
 
 typedef struct {
 	PyObject_HEAD
+
+	PyCFunction		write;
+	PyCFunction		flush;
+
+}	RRWriteFlush;
+
+typedef struct {
+	PyObject_HEAD
 	PyObject            *x_attr;        /* Attributes dictionary */
 
 	PyCFunction		cbwrite;
@@ -51,24 +59,40 @@ static PyTypeObject RRStdFileRedirect_Type;
 #define RRStdFileRedirectObject_Check(v) (Py_TYPE(v) == &RRStdFileRedirect_Type)
 
 static RRStdFileRedirectObject *
-newRRStdFileRedirectObject(PyObject *args)
+newRRStdFileRedirectObject ( PyObject * args )
 {
-	void * cbwrite, * cbflush;
+//	void * cbwrite, * cbflush;
 
 	//	Docs on format string -
 	//	https://docs.python.org/3/c-api/arg.html?highlight=pyarg_parsetuple#parsing-arguments
 
-	if ( ! PyArg_ParseTuple ( args, "OO:new", &cbwrite, &cbflush ) )
+//	if ( ! PyArg_ParseTuple ( args, "OO:new", &cbwrite, &cbflush ) )
+	RRWriteFlush * WF;
+	if ( ! PyArg_ParseTuple ( args, "O:new", &WF ) )
 		return NULL;
 
-	RRStdFileRedirectObject *self;
-	self = PyObject_New(RRStdFileRedirectObject, &RRStdFileRedirect_Type);
-	if (self == NULL)
+//	printf ( "newRRStdFileRedirectObject():  write 0x%08X  flush 0x%08X\n",
+//			 cbwrite, cbflush );
+
+//	printf ( "newRRStdFileRedirectObject():  RRStdFileRedirect_Type.tp_basicsize %d  "
+//			 "sizeof(RRStdFileRedirectObject) %d\n",  RRStdFileRedirect_Type.tp_basicsize,
+//			 										  sizeof(RRStdFileRedirectObject) );
+
+	RRStdFileRedirectObject *	self;
+	self = PyObject_New ( RRStdFileRedirectObject, &RRStdFileRedirect_Type );
+	if ( self == NULL )
 		return NULL;
+
+//	printf ( "newRRStdFileRedirectObject():  setting self ...\n" );
+
 	self->x_attr = NULL;
 
-	self->cbwrite = (PyCFunction)cbwrite;
-	self->cbflush = (PyCFunction)cbflush;
+//	self->cbwrite = (PyCFunction)cbwrite;
+//	self->cbflush = (PyCFunction)cbflush;
+	self->cbwrite = WF->write;
+	self->cbflush = WF->flush;
+
+//	Py_DECREF ( WF );		Done by the args tuple.
 
 	return self;
 }
@@ -92,13 +116,15 @@ RRStdFileRedirect_demo(RRStdFileRedirectObject *self, PyObject *args)
 }
 
 static PyObject *
-RRStdFileRedirect_write(RRStdFileRedirectObject *self, PyObject *args)
+RRStdFileRedirect_write ( RRStdFileRedirectObject * self, PyObject * args )
 {
+//	printf ( "RRStdFileRedirect_write(): cbwrite 0x%08X\n", self->cbwrite );
+
 	return self->cbwrite ( (PyObject *)self, args );
 }
 
 static PyObject *
-RRStdFileRedirect_flush(RRStdFileRedirectObject *self, PyObject *args)
+RRStdFileRedirect_flush ( RRStdFileRedirectObject * self, PyObject * args )
 {
 	return self->cbflush ( (PyObject *)self, args );
 }
@@ -214,13 +240,17 @@ rr_redirect_foo(PyObject *self, PyObject *args)
 /* Function of no arguments returning new RRStdFileRedirect object */
 
 static PyObject *
-rr_redirect_new(PyObject *self, PyObject *args)
+rr_redirect_new ( PyObject * self, PyObject * args )
 {
+//	printf ( "rr_redirect_new(): 0x%08X\n", rr_redirect_new );
+	
 	RRStdFileRedirectObject *rv;
 
-	rv = newRRStdFileRedirectObject(args);
-	if (rv == NULL)
+	rv = newRRStdFileRedirectObject ( args );
+	if ( rv == NULL )
 		return NULL;
+
+//	printf ( "rr_redirect_new(): returning 0x%08X\n", rv );
 
 	return (PyObject *)rv;
 }
