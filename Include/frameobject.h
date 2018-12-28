@@ -9,52 +9,53 @@ extern "C" {
 #endif
 
 typedef struct {
-    int b_type;                 /* what kind of block this is */
-    int b_handler;              /* where to jump to find handler */
-    int b_level;                /* value stack level to pop to */
+	int b_type;                 /* what kind of block this is */
+	int b_handler;              /* where to jump to find handler */
+	int b_level;                /* value stack level to pop to */
 } PyTryBlock;
 
 #define	BRADDS_F_FLAGS_NO_STACK			0x00000001
 #define BRADDS_F_FLAGS_FIRST_INSTR		0x00000002
-#define	BRADDS_F_FLAGS_RETURN			0x00000004
-#define	BRADDS_F_FLAGS_NEW_FRAME		0x00000008
+#define BRADDS_F_FLAGS_CALL_FUNCTION	0x00000004
+#define	BRADDS_F_FLAGS_RETURN			0x00000008
+#define	BRADDS_F_FLAGS_NEW_FRAME		0x00000010
 /* The idea of this "native call" flag is that it is set when a call is 
    made that does not create a  new frame.  When it is not set upon a return 
    then we know we need to clean things up and prepare to switch back to 
    the calling frame. */
-#define BRADDS_F_FLAGS_NATIVE_CALL		0x00000010
-#define BRADDS_F_FLAGS_JUMP_OFF_FOR		0x00000020
-#define BRADDS_F_FLAGS_CREATE_RECORD	0x00000040
+#define BRADDS_F_FLAGS_NATIVE_CALL		0x00000020
+#define BRADDS_F_FLAGS_JUMP_OFF_FOR		0x00000040
+#define BRADDS_F_FLAGS_CREATE_RECORD	0x00000080
 
 typedef struct _frame {
-    PyObject_VAR_HEAD
-    struct _frame *f_back;      /* previous frame, or NULL */
-    PyCodeObject *f_code;       /* code segment */
-    PyObject *f_builtins;       /* builtin symbol table (PyDictObject) */
-    PyObject *f_globals;        /* global symbol table (PyDictObject) */
-    PyObject *f_locals;         /* local symbol table (any mapping) */
-    PyObject **f_valuestack;    /* points after the last local */
-    /* Next free slot in f_valuestack.  Frame creation sets to f_valuestack.
-       Frame evaluation usually NULLs it, but a frame that yields sets it
-       to the current stack top. */
-    PyObject **f_stacktop;
-    PyObject *f_trace;          /* Trace function */
-    char f_trace_lines;         /* Emit per-line trace events? */
-    char f_trace_opcodes;       /* Emit per-opcode trace events? */
+	PyObject_VAR_HEAD
+	struct _frame *f_back;      /* previous frame, or NULL */
+	PyCodeObject *f_code;       /* code segment */
+	PyObject *f_builtins;       /* builtin symbol table (PyDictObject) */
+	PyObject *f_globals;        /* global symbol table (PyDictObject) */
+	PyObject *f_locals;         /* local symbol table (any mapping) */
+	PyObject **f_valuestack;    /* points after the last local */
+	/* Next free slot in f_valuestack.  Frame creation sets to f_valuestack.
+	   Frame evaluation usually NULLs it, but a frame that yields sets it
+	   to the current stack top. */
+	PyObject **f_stacktop;
+	PyObject *f_trace;          /* Trace function */
+	char f_trace_lines;         /* Emit per-line trace events? */
+	char f_trace_opcodes;       /* Emit per-opcode trace events? */
 
-    /* Borrowed reference to a generator, or NULL */
-    PyObject *f_gen;
+	/* Borrowed reference to a generator, or NULL */
+	PyObject *f_gen;
 
-    int f_lasti;                /* Last instruction if called */
-    /* Call PyFrame_GetLineNumber() instead of reading this field
-       directly.  As of 2.3 f_lineno is only valid when tracing is
-       active (i.e. when f_trace is set).  At other times we use
-       PyCode_Addr2Line to calculate the line from the current
-       bytecode index. */
-    int f_lineno;               /* Current line number */
-    int f_iblock;               /* index in f_blockstack */
-    char f_executing;           /* whether the frame is still executing */
-    PyTryBlock f_blockstack[CO_MAXBLOCKS]; /* for try and loop blocks */
+	int f_lasti;                /* Last instruction if called */
+	/* Call PyFrame_GetLineNumber() instead of reading this field
+	   directly.  As of 2.3 f_lineno is only valid when tracing is
+	   active (i.e. when f_trace is set).  At other times we use
+	   PyCode_Addr2Line to calculate the line from the current
+	   bytecode index. */
+	int f_lineno;               /* Current line number */
+	int f_iblock;               /* index in f_blockstack */
+	char f_executing;           /* whether the frame is still executing */
+	PyTryBlock f_blockstack[CO_MAXBLOCKS]; /* for try and loop blocks */
 	
 	int bradds_f_flags;			/*	See BRADDS_F_FLAGS_ defines */
 	const _Py_CODEUNIT * bradds_f_next_instr;
@@ -63,7 +64,7 @@ typedef struct _frame {
 //	PyObject **bradds_f_stack_pointer;	/* To maintain during a call */
 //	PyObject * bradds_async_arg;
 
-    PyObject *f_localsplus[1];  /* locals+stack, dynamically sized */
+	PyObject *f_localsplus[1];  /* locals+stack, dynamically sized */
 } PyFrameObject;
 
 
@@ -74,11 +75,11 @@ PyAPI_DATA(PyTypeObject) PyFrame_Type;
 #define PyFrame_Check(op) (Py_TYPE(op) == &PyFrame_Type)
 
 PyAPI_FUNC(PyFrameObject *) PyFrame_New(PyThreadState *, PyCodeObject *,
-                                        PyObject *, PyObject *);
+										PyObject *, PyObject *);
 
 /* only internal use */
 PyFrameObject* _PyFrame_New_NoTrack(PyThreadState *, PyCodeObject *,
-                                    PyObject *, PyObject *);
+									PyObject *, PyObject *);
 
 
 /* The rest of the interface is specific for frame objects */

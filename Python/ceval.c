@@ -6052,7 +6052,10 @@ main_loop:
         TARGET(CALL_FUNCTION) {
             PyObject **sp, *res;
             sp = stack_pointer;
+            
+            f->bradds_f_flags |=  BRADDS_F_FLAGS_CALL_FUNCTION;
             res = call_function(&sp, oparg, NULL);
+            f->bradds_f_flags &= ~BRADDS_F_FLAGS_CALL_FUNCTION;
 
 			if ( res && f->bradds_f_flags & BRADDS_F_FLAGS_NEW_FRAME ) {
 				f->bradds_f_oparg = oparg;
