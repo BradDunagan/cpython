@@ -369,3 +369,5 @@ xxsubtype xxsubtype.c
 #_codecs_jp _codecs_kr _codecs_tw unicodedata
 
 #rr_redirect rr_redirectmodule.c
+
+#rr_interface rr_interfacemodule.c
