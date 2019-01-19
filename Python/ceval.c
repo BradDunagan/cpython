@@ -3516,6 +3516,15 @@ exit_eval_frame:
 #undef FAST_DISPATCH
 }
 
+static BradDs_MarkRecordVariableCB mrvCB = 0;
+
+int	_BradDs_SetMarkRecordVariableCB ( BradDs_MarkRecordVariableCB CB )
+{
+    mrvCB = CB;
+    return 0;
+
+}   //  _BradDs_SetMarkRecordVariableCB()
+
 int		_BradDs_PyEval_EvalFrameDefault_Init ( PyFrameObject * f,
 											   int * instr_lb,
 											   int * instr_ub,
@@ -4831,6 +4840,10 @@ main_loop:
                 Py_DECREF(v);
                 goto error;
             }
+
+            if ( mrvCB ) {          //  bradds
+                v = mrvCB ( f, ns, name, v ); }
+
             if (PyDict_CheckExact(ns))
                 err = PyDict_SetItem(ns, name, v);
             else

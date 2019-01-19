@@ -11,7 +11,7 @@ PyAPI_DATA(PyTypeObject) PyZip_Type;
 typedef PyObject * (* BradDs_CreateRecordCB) ( PyObject * def_name,
 											   PyObject * rec_name );
 
-PyAPI_FUNC(int)	_BradDs_SetCreateRecordCB ( BradDs_CreateRecordCB ) ;
+PyAPI_FUNC(int)	_BradDs_SetCreateRecordCB ( BradDs_CreateRecordCB );
 
 
 #ifdef __cplusplus

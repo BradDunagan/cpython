@@ -139,6 +139,13 @@ PyAPI_FUNC(PyObject *) PyEval_EvalFrameEx(struct _frame *f, int exc);
 #ifndef Py_LIMITED_API
 PyAPI_FUNC(PyObject *) _PyEval_EvalFrameDefault(struct _frame *f, int exc);
 
+
+typedef PyObject * (* BradDs_MarkRecordVariableCB) ( PyObject * f,
+													 PyObject * ns,
+											   		 PyObject * name,
+													 PyObject * v );
+PyAPI_FUNC(int)	_BradDs_SetMarkRecordVariableCB ( BradDs_MarkRecordVariableCB );
+
 PyAPI_FUNC(int)	_BradDs_PyEval_EvalFrameDefault_Init ( struct _frame * f,
 													   int * instr_lb,
 													   int * instr_ub,

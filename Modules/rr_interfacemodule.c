@@ -12,7 +12,7 @@
 	other files, you'll have to create a file "foobarobject.h"; see
 	floatobject.h for an example. */
 
-//	The actual colletions of things, such as UDUIs, is gotten, at certain
+//	The actual collections of things, such as UDUIs, is gotten, at certain
 //	times, from the app.
 //
 //	The app provides some call(back)s for getting things.
@@ -86,13 +86,237 @@
 //		else
 //			err = PyObject_SetItem(ns, name, v);
 //
-//	Do this: Implement a class, name it, maybe, xy, and it to represent the 
+//	Do this: Implement a class, name it, maybe, xy, and use it to represent the 
 //	positions of controls.  Or implement a class, control, with attributes such 
 //	as x, y, w, h, name, etc..
 
+//	Is it worth it? Tracking record variables, detecting changes, callbacks and 
+//	calls to app to, for example, set properties of UDUI controls.
+//
+//	->	Its not just fancy UDUI control property setting. Its command records
+//		in general. Command record values must be synced when the same record
+//		is instantiated in multiple processes. After all, a record is a record
+//		and it must/should have the same values in multiple processes.
+//
+//	It is truely a bag of worms.
+//
+//	Good grief. Crap.
 
+//	If there are multiple CPython threads - can a record be instantiated and
+//	shared amongst threads?  That is, when a thread instantiates a record and 
+//	its variable members - ints, lists, dicts, etc. - will/can other threads
+//	that load/instantiate that same record affect those same member instances
+//	in memory such that they are shared between the threads?
 
+//	It seems that everthing about multiple instantiations of the same record
+//	is bad. That is, the idea of a single, shared memory between multiple 
+//	threads. But -
+//
+//		-	CPython already, by default, takes care of read/write issues with
+//			the GIL.
+//
+//	If, then, the GIL could be "disabled" on non-record variables - function
+//	locals. That might be something ...
+//
+//	It seems that CPthon should do that anyway because local variables are 
+//	accessable by other functions. That is, they are in their own dict of 
+//	the function frame. But -
+//
+//		-	It may be then that internal dict code, for example, that is not 
+//			thread safe.
+//
+//		-	If so then can the dict code, for example, be made thread safe?
+//
+//	Also - what about -
+//
+//		-	Garbage collection and memory allocation/deallocation in general?
+//
+//	Will it be worth the trouble?  Worth the high probability that such
+//	"enhancements" will not be successful?
+//
+//	Many attempts have been made to enhance multithreadability by mucking with 
+//	things associated with/by the GIL.
 
+//	The GIL, it seems, protects  * everything * (that is why it is Global) 
+//	when an interpreter runs.
+//
+//	->	But why can't -
+//
+//		-	A chunck of memory be allocated for each thread so that a dict, 
+//			for example, can be operated on in a thread-private chunk?
+//
+//	What happens when, for example, -
+//
+//		-	A new dict is created?
+//
+//		-	How is the memory allocated?
+//
+//	How hard would it be to reimpliment it?
+//
+//	->	Remember this -
+//
+//		-	The point is to run the interpreter free of having to worry
+//			about the GIL.
+//
+//	->	So the question is -
+//
+//		-	Why can't the GIL be gotten only when -
+//			-	allocating memory?
+//			-	calling a native module?
+//			-	etc.?
+//
+//	There are reasons. Otherwise it would not be an issue.
+
+//	gdb -tui
+//	https://stackoverflow.com/questions/39771932/gdb-tui-output-does-not-line-up
+//
+//	Show output in another terminal -
+//
+//		To get the tty name just type tty in that terminal.
+//
+//		For example, in ~/dev/myEmbdB/NoStack/, to debug NoS more nicely -
+//	
+//			$ gdb -tui -ex "tty /dev/pts/7" NoS
+
+//	Objects/dictobject.c -
+//
+//		lines 529, 532
+//		PyObject_MALLOC
+//
+//	Objects/obmalloc.c -
+//		lines 2199
+//
+//	Python/pystate.c -
+//		lines 1015			PyGILState_Check()
+
+//	See, in the interpreter loop, -
+//
+//			if (_Py_atomic_load_relaxed(
+//					&_PyRuntime.ceval.gil_drop_request))
+//			{
+//				...
+//
+//	What makes a GIL drop request? -
+//
+//		-	Any thread that wants to run anything in CPython.
+//
+//		-	"anything" includes -
+//
+//			-	Especially the interpreter.
+//
+//			-	Any memory allocation.
+//
+//			-	Etc..
+//
+//			-	See below.
+//
+//	Introduction to the GIL -
+//
+//		In eval_gil.h - see -
+//
+//			Notes about the implementation:
+//
+//			...
+//
+//	In ceval.c -
+//
+//	#define SET_GIL_DROP_REQUEST() 
+//
+//	Which is used/called by/in (ceval_gil.h) -
+//
+//	static void take_gil(PyThreadState *tstate)
+//	{
+//		...
+//
+//	Which is called by -
+//
+//		-	Fuctions in ceval.c.
+
+//	What initially sets/establishes the GIL? -
+//
+//		#0  take_gil () 				at Python/ceval_gil.h:225
+//		#1  PyEval_InitThreads () 		at Python/ceval.c:161
+//		#2  _Py_InitializeCore_impl () 	at Python/pylifecycle.c:731
+//		#3  _Py_InitializeCore () 		at Python/pylifecycle.c:859
+//		#4  _Py_InitializeFromConfig () at Python/pylifecycle.c:1012
+//		#5  Py_InitializeEx () 			at Python/pylifecycle.c:1049
+//		#6  CPythonInit () 				at /home/brad/dev/rr-python/utils/utils.c:477
+//		#7  main () 					at /home/brad/dev/rr-python/NoStack/NoStack.c:1752
+
+//	What requests the GIL? 
+//
+//	The request is made by calling -
+//
+//		drop_gil()
+//
+//	Which is called by -
+//
+//		PyEval_ReleaseLock()
+//		PyEval_ReleaseThread()
+//		PyEval_SaveThread()
+//		PyEval_RestoreThread()		//	when finalizing (terminating an interpreter?)
+//		_PyEval_EvalFrameDefault()	//	when yielding to another thread
+//
+//	PyEval_ReleaseLock() is called by -
+//		PyThreadState_DeleteCurrent()		pystate.c
+//	Which is called by -
+//		_threadmodule.c				//	presumably when a Python thread is ending
+//		PyGILState_Release()		//	callec by alot of stuff
+//
+//	PyEval_ReleaseThread() is called by -
+//		_testembed.c
+//		thats it?
+//
+//	PyEval_RestoreThread() is called by
+//		
+//
+//	PyEval_SaveThread()	is sometimes (mostly times) called via the macro -
+//		Py_BEGIN_ALLOW_THREADS	
+//	and that - by far - mostly by modules.
+
+//	On memory allocation -
+//
+//	See, in obmalloc.c -
+//
+//		/* An object allocator for Python.
+//		   ...
+
+//	On garbage collection -
+//
+//	Seems to be implemented in a module -
+//
+//		Modules/gcmodule.c
+//
+//		/* This is the main function.  Read this to understand how the
+//		* collection process works. */
+//		static Py_ssize_t
+//		collect(int generation, Py_ssize_t *n_collected, Py_ssize_t *n_uncollectable,
+//				int nofail)
+//
+//	Also see, in objimp.h -
+//
+// 		* Garbage Collection Support
+//
+//	->	The question is this: What memory (blocks) does the GC work on?
+//
+//	->	For the "enhancement" to work -
+//
+//		-	There should be an area (name?) of memory for each thread's
+//			private objects to be allocated from.
+//
+//		-	Maybe call it "private" memory.
+//
+//		-	Each thread with private allocations should have a GC that operates
+//			on only the blocks allocated out of that memory.
+//
+//	->	Problem -
+//
+//		-	What happens when a thread-private object references an outside
+//			object?
+//
+//			-	Can it be detected?
+//
+//			-	Is it an error?
 
 PyObject * 			jsonMod;
 
@@ -232,6 +456,13 @@ static PyObject * 	rr_interface_set_callback ( PyObject * self, PyObject * args 
 }	//	rr_interface_set_callback()
 
 
+//	Note and Know -
+//
+//	Container objects (objects which reference other objects) must support
+//	garbage collection!  Follow the rules!
+//
+//		->	https://docs.python.org/3/c-api/gcsupport.html
+//
 typedef struct {
     PyObject_HEAD
     PyObject            * attr;        /* Attributes dictionary */
@@ -246,18 +477,171 @@ control_new ( PyTypeObject * type, PyObject * args, PyObject * kwds )
 
 //	printf ( "control_new()\n" );
 
-    /* create control_object structure */
-    control = (control_object *)type->tp_alloc ( type, 0 );
-    if ( control == NULL )
-        return NULL;
+	//	Call back the app to get the frameId, paneId and controlId.
+	//	No.  Instead: Each frame may have at most one PE. So the PE and its
+	//	frameId are linked. Likewise, each frame may have at most one UDUI 
+	//	pane.
+	//	So the app will gather what frame and pane a callback is applied 
+	//	to by association with the PE.
+	//	Panel? - But what about the panel the control goes on? There will be 
+	//	multiple panels when the UDUI has pages or tabs.
+	//	The interface needs a way of specifying the UDUI panel a new control 
+	//	is to be added to.
 
-	control->attr = PyDict_New();
-	if ( control->attr == NULL ) {
-        Py_DECREF(control);
-        return NULL; }
+	//	App wide, its -
+	//		frame
+	//			pane
+	//				panel
+
+	//	Now its -
+	//		import rr_interface as rr;
+	//		...
+	//		c = rr.control()
+
+	//	The problem is knowing how to identify and specify the frame, pane and
+	//	panel in a command record.  ID?  Name?
+	//	Does it matter?  The ID or Name can be maintained in a record variable.
+	//	If wrong the statement will simply error - and the user can determine 
+	//	and apply the correction.
+
+	//		f = rr.getFrame ( ID or Name );		//	exception if not found.
+
+	//	Found from what?  UIsObject?  Each process (PE/cpython) maintains a
+	//	* copy *?
+
+	//	Multiple cpython threads? No. The GIL makes multiple threads execute 
+	//	sequentially - no speed up.
+
+	//	It does not appear that an address of a SharedArrayBuffer can be had.
+	//	That is, no sharing of memory between workers can be done.
+
+	//	Maybe this -
+	//	Track what changes.
+
+	//	The problem is this: Large amount of data - examples -
+	//		command records
+	//		world objects
+	//		UDUIs
+	//	Each CPython worker must have a copy of these. Good Grief.
+	//
+	//	Command Records -
+	//		Can it be detected when a record variable is instantiated, value 
+	//		changes? If yes then message that to other workers.
+	//
+	//	Bite the bullet. No shared memory. Duplicates of the same data in 
+	//	multiple processes. Its the browser, protected memory. Deal with it.
+	//
+	//	Generalize to a record. That is, maintain UDUI data as a command record 
+	//	in CPython/rr_interfacemodule.
+
+	//	Command Records and Tracking Changes -
+	//
+	//	Set an attribute in CR (module).  See utils.c CreateRecord().  Run 
+	//	NoStack RecDef1b() for an example of how CreateRecord() is called.
+	//	Maybe not necessary. CreateRecord() already sets __file__ to 
+	//	">rr-record<".
+	//
+	//	So, track changes of module variables and their values when the 
+	//	module attribute __file__ is set to ">rr-record<".
+	//
+	//	Look at bytecode STORE_NAME. There -
+	//		Check module __file__ attribute for ">rr-record<"
+	//		If  false  then
+	//			no worries, do nothing special, continue
+	//		Call back specifying what has changed and the new value.
+	//
+	//	The callback (probably something in utils.c) will buffer all the 
+	//	changes and provide-them-back/make-them-accessable to the JS app 
+	//	on return from the JS app call (step, for example).
+	//
+	//	Also look at STORE_ATTR and STORE_SUBSCR.  There are probably others.
+	//
+	//	See/run RecDef2a() in NoStack.c.
+	//
+	//	When a variable value changes how is it determined that the variable
+	//	is a CR member?
+	//		-	When CR instance is created create an attribute in each of its
+	//			members.  Maybe __cr__, set it's value to the ID of the module
+	//			(use the builtin id() function or just the C pointer of the 
+	//			module object).
+	//		-	Do this in utils.c CreateRecord().
+	//		-	The attribute will need to be set on  * all *  objects? That,
+	//			is, for example, all items of a tuple?
+
+
+
+	//	This -
+	//		process-shared chunk(s) of memory - SharedArrayBuffer
+	//	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer
+	//	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Atomics
+	//	https://github.com/tc39/ecmascript_sharedmem/blob/master/TUTORIAL.md
+	//	Allocated in JS. 
+	//	How is it interpreted on the C side?  I think its this -
+	//		On the JS side - got to set/get bytes.  int, float, etc.
+	//		Each value is a fixed size - so there locations in the buffer can 
+	//		be tracked.
+	//		Likewise on the C side.
+	//	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Typed_arrays
+
+
+
+
+
+	//	Arguments -
+	//		type [, x, y, w, h, name]
+	const char * controlType = 0;
+	int x = 10, y = 10, w = 34, h = 18;
+	const char * controlName = 0;
+	if ( ! PyArg_ParseTuple ( args, "s|lllls:control", &controlType,
+													   &x, &y, &w, &h,
+													   &controlName ) )
+		return NULL;
+
+	if (	(strcmp ( controlType, "panel" )  != 0)
+		 &&	(strcmp ( controlType, "label" )  != 0)
+		 &&	(strcmp ( controlType, "button" ) != 0)
+		 &&	(strcmp ( controlType, "input" )  != 0)
+		 &&	(strcmp ( controlType, "list" )   != 0) ) {
+		PyErr_SetString ( PyExc_TypeError,
+						  "unrecognized control type");
+		return NULL; }
+
+    control = (control_object *)type->tp_alloc ( type, 0 );
+
+	int bOk = 0;
+	while ( 1 ) {
+		if ( control == NULL )
+			break;
+
+		PyObject * dict = control->attr = PyDict_New();
+		if ( dict == NULL ) 
+			break;
+
+		if ( PyDict_SetItemString ( dict, "controlType", 
+									PyUnicode_FromString ( controlType ) ) ) 
+			break;
+		if ( PyDict_SetItemString ( dict, "x", PyLong_FromLong ( x ) ) ) 
+			break;
+		if ( PyDict_SetItemString ( dict, "y", PyLong_FromLong ( y ) ) ) 
+			break;
+		if ( PyDict_SetItemString ( dict, "w", PyLong_FromLong ( w ) ) ) 
+			break;
+		if ( PyDict_SetItemString ( dict, "h", PyLong_FromLong ( h ) ) ) 
+			break;
+		if ( 	controlName
+			 && PyDict_SetItemString ( dict, "controlName", 
+			 						   PyUnicode_FromString ( controlName ) ) ) 
+			break;
+		bOk = 1;
+		break;
+	}	//	while ( 1 )
+
+	if ( (! bOk) && control ) {
+		Py_DECREF(control);
+		return NULL; } 
 
     return (PyObject *)control;
-}
+}	//	control_new()
 
 static int
 control_init ( control_object * control, PyObject * args, PyObject * kwdargs )
@@ -360,7 +744,7 @@ control_setattr ( control_object * self, const char * name, PyObject * v )
 			break;
 		}
 
-		return PyDict_SetItemString ( self->attr, name, v) ;
+		return PyDict_SetItemString ( self->attr, name, v);
 	}
 }	//	control_setattr()
 
