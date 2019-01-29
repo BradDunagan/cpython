@@ -144,7 +144,16 @@ static long dxp[256];
 #include <errno.h>
 #endif
 #include "pythread.h"
+
+static int                  bCODumpEnabled = 0;
+
+static BradDs_CODumpCB      CODumpCB = 0;
+
+static BradDs_StackDumpCB   StackDumpCB = 0;
+
 #include "ceval_gil.h"
+
+
 
 int
 PyEval_ThreadsInitialized(void)
@@ -185,6 +194,9 @@ PyEval_AcquireLock(void)
 void
 PyEval_ReleaseLock(void)
 {
+    if ( StackDumpCB && bCODumpEnabled )
+        StackDumpCB ( "drop_gil" );
+
     /* This function must succeed when the current thread state is NULL.
        We therefore avoid PyThreadState_GET() which dumps a fatal error
        in debug mode.
@@ -209,6 +221,9 @@ PyEval_AcquireThread(PyThreadState *tstate)
 void
 PyEval_ReleaseThread(PyThreadState *tstate)
 {
+    if ( StackDumpCB && bCODumpEnabled )
+        StackDumpCB ( "drop_gil" );
+
     if (tstate == NULL)
         Py_FatalError("PyEval_ReleaseThread: NULL thread state");
     if (PyThreadState_Swap(NULL) != tstate)
@@ -253,7 +268,17 @@ _PyEval_SignalAsyncExc(void)
 PyThreadState *
 PyEval_SaveThread(void)
 {
-    PyThreadState *tstate = PyThreadState_Swap(NULL);
+    PyThreadState *	tstate = PyThreadState_Get();
+    if (tstate == NULL)
+        Py_FatalError("PyEval_SaveThread: NULL tstate");
+    if ( tstate != (PyThreadState*)_Py_atomic_load_relaxed (
+                    &_PyRuntime.ceval.gil.holder ) ) {
+        return NULL; }
+
+    if ( StackDumpCB && bCODumpEnabled )
+        StackDumpCB ( "drop_gil" );
+
+    tstate = PyThreadState_Swap(NULL);
     if (tstate == NULL)
         Py_FatalError("PyEval_SaveThread: NULL tstate");
     assert(gil_created());
@@ -264,14 +289,18 @@ PyEval_SaveThread(void)
 void
 PyEval_RestoreThread(PyThreadState *tstate)
 {
-    if (tstate == NULL)
-        Py_FatalError("PyEval_RestoreThread: NULL tstate");
+    if ( tstate == NULL )
+        return;
     assert(gil_created());
 
     int err = errno;
     take_gil(tstate);
     /* _Py_Finalizing is protected by the GIL */
     if (_Py_IsFinalizing() && !_Py_CURRENTLY_FINALIZING(tstate)) {
+
+        if ( StackDumpCB && bCODumpEnabled )
+            StackDumpCB ( "drop_gil" );
+
         drop_gil(tstate);
         PyThread_exit_thread();
         Py_UNREACHABLE();
@@ -548,20 +577,52 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
     return tstate->interp->eval_frame(f, throwflag);
 }
 
+PyAPI_FUNC(int) _BradDs_EnableCODump ( int bEnable )
+{
+    bCODumpEnabled = bEnable;
+    return 0;
+}   //  _BradDs_EnableCODump()
+
+PyAPI_FUNC(int)	_BradDs_SetCODumpCB ( BradDs_CODumpCB CB )
+{
+    if ( _Py_TracingPossible && CODumpCB && ! CB ) {
+        _Py_TracingPossible = 0;
+    }
+    CODumpCB = CB;
+    if ( CB ) {
+        _Py_TracingPossible = 1;
+    }
+    return 0;
+}
+
+PyAPI_FUNC(void)	_BradDs_SetStackDumpCB ( BradDs_StackDumpCB CB )
+{
+    StackDumpCB = CB;
+}
+
 PyObject* _Py_HOT_FUNCTION
 _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
 {
-//  {
-//  	const char * name = (char *)PyUnicode_DATA ( f->f_code->co_name );
-//  	const char * filename = (char *)PyUnicode_DATA ( f->f_code->co_filename );
-//
-//      if ( strstr ( filename, "/lib/" ) ) {
-//          PySys_WriteStderr ( "\nbradds dbug _PyEval_EvalFrameDefault(): "
-//                              "co_name: %s  "
-//                              "co_filenane: %s\n",
-//                              name, filename );
-//      }
-//  }
+    if ( bCODumpEnabled )
+    {
+    	const char * name = (char *)PyUnicode_DATA ( f->f_code->co_name );
+    	const char * filename = (char *)PyUnicode_DATA ( f->f_code->co_filename );
+  
+    //    PySys_WriteStderr ( "\nbradds dbug _PyEval_EvalFrameDefault(): "
+    //                      "co_name: %s  "
+    //                      "co_filename: %s\n",
+    //                      name, filename );
+        //  Example filename -
+        //      /home/brad/dev/fork/install-py3.7/lib/python3.7/threading.py
+        const char * pn = filename;     //  write just file name (not path)
+        const char * pc = pn;
+        while ( *pc ) { if ( *pc++ == '/' ) pn = pc; }
+
+        PySys_WriteStderr ( "co_name: %-32s  "
+                            "co_filename: %s\n",
+                            name, pn );
+
+    }
 
 #ifdef DXPAIRS
     int lastopcode = 0;
@@ -989,6 +1050,10 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
                 /* Give another thread a chance */
                 if (PyThreadState_Swap(NULL) != tstate)
                     Py_FatalError("ceval: tstate mix-up");
+
+                if ( StackDumpCB && bCODumpEnabled )
+                    StackDumpCB ( "drop_gil" );
+
                 drop_gil(tstate);
 
                 /* Other threads may run now */
@@ -999,6 +1064,9 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
                 if (_Py_IsFinalizing() &&
                     !_Py_CURRENTLY_FINALIZING(tstate))
                 {
+                    if ( StackDumpCB && bCODumpEnabled )
+                        StackDumpCB ( "drop_gil" );
+
                     drop_gil(tstate);
                     PyThread_exit_thread();
                 }
@@ -1045,6 +1113,16 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
             if (err)
                 /* trace function raised an exception */
                 goto error;
+        }
+        else 
+        if (_Py_TracingPossible && bCODumpEnabled ) {
+            int err;
+            err = maybe_call_line_trace(tstate->c_tracefunc,
+                                        tstate->c_traceobj,
+                                        tstate, f,
+                                        &instr_lb, &instr_ub, &instr_prev);
+            if ( err )
+                err = 0;
         }
 
         /* Extract opcode and argument */
@@ -3539,6 +3617,14 @@ int		_BradDs_PyEval_EvalFrameDefault_Init ( PyFrameObject * f,
 }	//	_BradDs_PyEval_EvalFrameDefault_Init()
 
 PyObject* _Py_HOT_FUNCTION
+_BradDs_PyEval_EvalFrameDefault0(PyFrameObject *f, int throwflag)
+{
+	int instr_ub = -1, instr_lb = 0, instr_prev = -1;
+	bradds_maybe_ ( f, 0, &instr_lb, &instr_ub, &instr_prev );
+    return _BradDs_PyEval_EvalFrameDefault ( f, throwflag, 0, 0, 0 );
+}
+
+PyObject* _Py_HOT_FUNCTION
 _BradDs_PyEval_EvalFrameDefault ( PyFrameObject *f, int throwflag,
 													int * instr_lb,
 													int * instr_ub,
@@ -3616,7 +3702,9 @@ _BradDs_PyEval_EvalFrameDefault ( PyFrameObject *f, int throwflag,
 	f->f_stacktop = stack_pointer;			\
 	f->bradds_f_next_instr = next_instr;	\
 	goto fast_yield;										
-#define DISPATCH()													\
+#define DISPATCH()			                                        \
+    if ( ! instr_lb )                                               \
+        continue;           										\
 	if ( bradds_maybe_ ( f, INSTR_OFFSET(),							\
 							instr_lb, instr_ub, instr_prev ) ) {	\
 		retval = Py_None;											\
@@ -3782,6 +3870,21 @@ _BradDs_PyEval_EvalFrameDefault ( PyFrameObject *f, int throwflag,
     assert(_Py_IS_ALIGNED(PyBytes_AS_STRING(co->co_code), sizeof(_Py_CODEUNIT)));
     first_instr = (_Py_CODEUNIT *) PyBytes_AS_STRING(co->co_code);
 
+/*
+    if ( tstate->bd_ts_flags & BD_TS_FLAG_USE_BREADS_EVAL ) {
+
+        #define INSTR_OFFSET()  \
+            (sizeof(_Py_CODEUNIT) * (int)(next_instr - first_instr))
+        #define NEXTOPARG()  do { \
+                _Py_CODEUNIT word = *next_instr; \
+                opcode = _Py_OPCODE(word); \
+                oparg = _Py_OPARG(word); \
+                next_instr++; \
+            } while (0)
+
+    }
+*/
+
     stack_pointer = f->f_stacktop;
     assert(stack_pointer != NULL);
     f->f_stacktop = NULL;       /* remains NULL unless yield suspends frame */
@@ -3885,6 +3988,10 @@ main_loop:
                 /* Give another thread a chance */
                 if (PyThreadState_Swap(NULL) != tstate)
                     Py_FatalError("ceval: tstate mix-up");
+
+                if ( StackDumpCB && bCODumpEnabled )
+                    StackDumpCB ( "drop_gil" );
+
                 drop_gil(tstate);
 
                 /* Other threads may run now */
@@ -3895,6 +4002,9 @@ main_loop:
                 if (_Py_IsFinalizing() &&
                     !_Py_CURRENTLY_FINALIZING(tstate))
                 {
+                    if ( StackDumpCB && bCODumpEnabled )
+                        StackDumpCB ( "drop_gil" );
+
                     drop_gil(tstate);
                     PyThread_exit_thread();
                 }
@@ -7307,8 +7417,14 @@ maybe_call_line_trace(Py_tracefunc func, PyObject *obj,
     */
     if ((frame->f_lasti == *instr_lb || frame->f_lasti < *instr_prev)) {
         frame->f_lineno = line;
-        if (frame->f_trace_lines) {
-            result = call_trace(func, obj, tstate, frame, PyTrace_LINE, Py_None);
+    //  if (frame->f_trace_lines) {
+    //      result = call_trace(func, obj, tstate, frame, PyTrace_LINE, Py_None);
+    //  }
+    //  else
+        while ( bCODumpEnabled ) {
+            CODumpCB ( tstate, frame  );
+            result = 1;
+            break;
         }
     }
     /* Always emit an opcode event if we're tracing all opcodes. */

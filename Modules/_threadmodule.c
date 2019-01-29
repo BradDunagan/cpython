@@ -1058,6 +1058,7 @@ thread_PyThread_start_new_thread(PyObject *self, PyObject *fargs)
         PyMem_DEL(boot);
         return PyErr_NoMemory();
     }
+//  boot->tstate->bd_ts_flags |= BD_TS_FLAG_USE_BREADS_EVAL;
     Py_INCREF(func);
     Py_INCREF(args);
     Py_XINCREF(keyw);

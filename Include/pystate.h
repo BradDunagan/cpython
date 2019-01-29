@@ -208,6 +208,7 @@ typedef struct _err_stackitem {
 
 } _PyErr_StackItem;
 
+#define BD_TS_FLAG_USE_BREADS_EVAL      0x00000001
 
 typedef struct _ts {
     /* See Python/ceval.c for comments explaining most fields */
@@ -216,6 +217,8 @@ typedef struct _ts {
     struct _ts *next;
     PyInterpreterState *interp;
 
+    int bd_ts_flags;
+    
     struct _frame *frame;
     int recursion_depth;
     char overflowed; /* The stack has overflowed. Allow 50 more calls

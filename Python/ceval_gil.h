@@ -121,6 +121,7 @@ static void create_gil(void)
     _Py_ANNOTATE_RWLOCK_CREATE(&_PyRuntime.ceval.gil.locked);
     _Py_atomic_store_explicit(&_PyRuntime.ceval.gil.locked, 0,
                               _Py_memory_order_release);
+    _Py_atomic_store_relaxed(&_PyRuntime.ceval.gil.holder, 0);
 }
 
 static void destroy_gil(void)
@@ -162,6 +163,7 @@ static void drop_gil(PyThreadState *tstate)
     MUTEX_LOCK(_PyRuntime.ceval.gil.mutex);
     _Py_ANNOTATE_RWLOCK_RELEASED(&_PyRuntime.ceval.gil.locked, /*is_write=*/1);
     _Py_atomic_store_relaxed(&_PyRuntime.ceval.gil.locked, 0);
+    _Py_atomic_store_relaxed(&_PyRuntime.ceval.gil.holder, 0);
     COND_SIGNAL(_PyRuntime.ceval.gil.cond);
     MUTEX_UNLOCK(_PyRuntime.ceval.gil.mutex);
 
@@ -216,6 +218,8 @@ static void take_gil(PyThreadState *tstate)
         }
     }
 _ready:
+    _Py_atomic_store_relaxed(&_PyRuntime.ceval.gil.holder, 
+                             (uintptr_t)tstate);
 #ifdef FORCE_SWITCHING
     /* This mutex must be taken before modifying
        _PyRuntime.ceval.gil.last_holder (see drop_gil()). */

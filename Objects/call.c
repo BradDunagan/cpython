@@ -288,7 +288,13 @@ function_code_fastcall(PyCodeObject *co, PyObject *const *args, Py_ssize_t nargs
 	//	f->bradds_f_flags |= BRADDS_F_FLAGS_RETURN;
 		return (PyObject *)f; }
 
-	result = PyEval_EvalFrameEx(f,0);
+	if ( tstate->bd_ts_flags & BD_TS_FLAG_USE_BREADS_EVAL ) {
+		f->bradds_f_flags |= BRADDS_F_FLAGS_FIRST_INSTR;
+		result = _BradDs_PyEval_EvalFrameDefault0 ( f, 0 );
+	//	result = PyEval_EvalFrameEx(f,0);
+	}
+	else
+		result = PyEval_EvalFrameEx(f,0);
 
 	if (Py_REFCNT(f) > 1) {
 		Py_DECREF(f);

@@ -363,6 +363,8 @@ new_threadstate(PyInterpreterState *interp, int init)
     if (tstate != NULL) {
         tstate->interp = interp;
 
+        tstate->bd_ts_flags = 0;
+        
         tstate->frame = NULL;
         tstate->recursion_depth = 0;
         tstate->overflowed = 0;

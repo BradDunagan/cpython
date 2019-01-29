@@ -138,7 +138,17 @@ PyAPI_FUNC(PyObject *) PyEval_EvalFrame(struct _frame *);
 PyAPI_FUNC(PyObject *) PyEval_EvalFrameEx(struct _frame *f, int exc);
 #ifndef Py_LIMITED_API
 PyAPI_FUNC(PyObject *) _PyEval_EvalFrameDefault(struct _frame *f, int exc);
+PyAPI_FUNC(PyObject *) _BradDs_PyEval_EvalFrameDefault0(struct _frame *f, int exc);
 
+typedef void (* BradDs_CODumpCB) ( PyObject * thread_state, PyObject * frame );
+
+PyAPI_FUNC(int)	_BradDs_EnableCODump ( int bEnableCODump );
+	
+PyAPI_FUNC(int)	_BradDs_SetCODumpCB ( BradDs_CODumpCB CB );
+
+typedef void (* BradDs_StackDumpCB) ( const char * atFnc );
+
+PyAPI_FUNC(void)	_BradDs_SetStackDumpCB ( BradDs_StackDumpCB CB );
 
 typedef PyObject * (* BradDs_MarkRecordVariableCB) ( PyObject * f,
 													 PyObject * ns,

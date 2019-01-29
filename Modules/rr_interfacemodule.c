@@ -456,6 +456,42 @@ static PyObject * 	rr_interface_set_callback ( PyObject * self, PyObject * args 
 }	//	rr_interface_set_callback()
 
 
+PyDoc_STRVAR(rr_interface_release_gil_doc,
+"releaseGIL()\n\
+\n\
+Release the GIL.");
+
+static PyObject * 	rr_interface_release_gil ( PyObject * self, PyObject * args )
+{
+	PyEval_ReleaseLock();
+
+//  boot->tstate->bd_ts_flags |= BD_TS_FLAG_USE_BREADS_EVAL;
+
+	Py_INCREF(Py_None);
+	return Py_None;
+}	//	rr_interface_release_gil()
+
+
+PyDoc_STRVAR(rr_interface_enable_co_dump_doc,
+"enableCODump()\n\
+\n\
+Release the GIL.");
+
+static PyObject * 	rr_interface_enable_co_dump ( PyObject * self, PyObject * args )
+{
+	long	bEnable;
+
+		//	https://docs.python.org/3/c-api/arg.html?highlight=pyarg_parsetuple#parsing-arguments
+	if ( ! PyArg_ParseTuple ( args, "l:enableCODump", &bEnable ) )
+		return NULL;
+
+	_BradDs_EnableCODump ( (int)bEnable );
+
+	Py_INCREF(Py_None);
+	return Py_None;
+}	//	rr_interface_enable_co_dump()
+
+
 //	Note and Know -
 //
 //	Container objects (objects which reference other objects) must support
@@ -820,6 +856,12 @@ static PyMethodDef rr_interface_methods[] = {
 
 	{"setCallback",		rr_interface_set_callback,	METH_VARARGS,
 		rr_interface_set_callback_doc},
+
+	{"releaseGIL",		rr_interface_release_gil,	METH_VARARGS,
+		rr_interface_release_gil_doc},
+
+	{"enableCODump",	rr_interface_enable_co_dump,	METH_VARARGS,
+		rr_interface_enable_co_dump_doc},
 
 	{"addUI",           rr_interface_add_ui,		METH_VARARGS,
 		rr_interface_add_ui_doc},

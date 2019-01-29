@@ -266,7 +266,21 @@ PyThread_allocate_lock(void)
         }
     }
 
-    dprintf(("PyThread_allocate_lock() -> %p\n", lock));
+    nlocks++;
+    dprintf(("PyThread_allocate_lock() -> %p  (nlocks %d)\n", lock, nlocks));
+
+#define BT_BUF_SIZE     6
+    void * buffer [BT_BUF_SIZE];
+    int i, nbt = backtrace ( &buffer, BT_BUF_SIZE );
+    char ** strings = backtrace_symbols ( buffer, nbt );
+    if ( strings ) {
+        for ( i = 0; i < nbt; i++ ) {
+            dprintf(("  %s\n", strings[i] ));
+        }
+        free ( strings );
+    }
+#undef  BT_BUF_SIZE
+
     return (PyThread_type_lock)lock;
 }
 
@@ -286,6 +300,9 @@ PyThread_free_lock(PyThread_type_lock lock)
     CHECK_STATUS("sem_destroy");
 
     PyMem_RawFree((void *)thelock);
+
+    nlocks--;
+    dprintf(("PyThread_free_lock() (nlocks %d)\n", nlocks));
 }
 
 /*

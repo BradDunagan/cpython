@@ -1,0 +1,3 @@
+break rr_interfacemodule.c:466
+break _PyMem_DebugCheckGIL
+disable $bpnum

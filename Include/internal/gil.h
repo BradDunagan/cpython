@@ -38,6 +38,9 @@ struct _gil_runtime_state {
     PyCOND_T switch_cond;
     PyMUTEX_T switch_mutex;
 #endif
+
+    /* Current PyThreadState holding/locking the GIL. */
+    _Py_atomic_address holder;
 };
 
 #ifdef __cplusplus

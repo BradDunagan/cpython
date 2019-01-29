@@ -23,6 +23,8 @@
 
 #include <stdlib.h>
 
+#include <execinfo.h>
+
 #include "pythread.h"
 
 #ifndef _POSIX_THREADS
@@ -56,6 +58,8 @@ static int thread_debug = 0;
 static int initialized;
 
 static void PyThread__init_thread(void); /* Forward */
+
+static int  nlocks = 0;
 
 void
 PyThread_init_thread(void)
