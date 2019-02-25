@@ -6069,7 +6069,15 @@ main_loop:
 				Py_INCREF(retval);
 				NO_STACK_RETURN(); }
 
-			f->bradds_f_flags |= BRADDS_F_FLAGS_NATIVE_CALL;
+		//	f->bradds_f_flags |= BRADDS_F_FLAGS_NATIVE_CALL;
+        //  Bug:    BRADDS_F_FLAGS_NATIVE_CALL flag remains after a native
+        //          and other steps are executed before the non-native return.
+        //          On non-native return f->f_stacktop is not set properly.
+        //  See TARGET(RETURN_VALUE). It may be that RETURN_VALUE is not
+        //  executed for native calls (which would make sense because native
+        //  call execution completes in one step). If that is always true then 
+        //  this flag is unnecessary.
+        //  Just commenting this out for now.
 
             stack_pointer = sp;
             PUSH(res);
