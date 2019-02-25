@@ -167,6 +167,10 @@ PyEval_InitThreads(void)
     if (gil_created())
         return;
     create_gil();
+    
+    if ( StackDumpCB && bCODumpEnabled )
+        StackDumpCB ( "take_gil" );
+
     take_gil(PyThreadState_GET());
     _PyRuntime.ceval.pending.main_thread = PyThread_get_thread_ident();
     if (!_PyRuntime.ceval.pending.lock)
@@ -185,6 +189,9 @@ _PyEval_FiniThreads(void)
 void
 PyEval_AcquireLock(void)
 {
+    if ( StackDumpCB && bCODumpEnabled )
+        StackDumpCB ( "take_gil" );
+
     PyThreadState *tstate = PyThreadState_GET();
     if (tstate == NULL)
         Py_FatalError("PyEval_AcquireLock: current thread state is NULL");
@@ -212,6 +219,10 @@ PyEval_AcquireThread(PyThreadState *tstate)
         Py_FatalError("PyEval_AcquireThread: NULL new thread state");
     /* Check someone has called PyEval_InitThreads() to create the lock */
     assert(gil_created());
+
+    if ( StackDumpCB && bCODumpEnabled )
+        StackDumpCB ( "take_gil" );
+
     take_gil(tstate);
     if (PyThreadState_Swap(tstate) != NULL)
         Py_FatalError(
@@ -245,6 +256,10 @@ PyEval_ReInitThreads(void)
         return;
     recreate_gil();
     _PyRuntime.ceval.pending.lock = PyThread_allocate_lock();
+
+    if ( StackDumpCB && bCODumpEnabled )
+        StackDumpCB ( "take_gil" );
+
     take_gil(current_tstate);
     _PyRuntime.ceval.pending.main_thread = PyThread_get_thread_ident();
 
@@ -294,6 +309,10 @@ PyEval_RestoreThread(PyThreadState *tstate)
     assert(gil_created());
 
     int err = errno;
+
+    if ( StackDumpCB && bCODumpEnabled )
+        StackDumpCB ( "take_gil" );
+
     take_gil(tstate);
     /* _Py_Finalizing is protected by the GIL */
     if (_Py_IsFinalizing() && !_Py_CURRENTLY_FINALIZING(tstate)) {
@@ -1057,6 +1076,9 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
                 drop_gil(tstate);
 
                 /* Other threads may run now */
+
+                if ( StackDumpCB && bCODumpEnabled )
+                    StackDumpCB ( "take_gil" );
 
                 take_gil(tstate);
 
@@ -3996,6 +4018,9 @@ main_loop:
 
                 /* Other threads may run now */
 
+                if ( StackDumpCB && bCODumpEnabled )
+                    StackDumpCB ( "take_gil" );
+
                 take_gil(tstate);
 
                 /* Check if we should make a quick exit. */
@@ -6192,7 +6217,7 @@ main_loop:
 				Py_INCREF(retval);
 				NO_STACK_RETURN(); }
 
-			f->bradds_f_flags |= BRADDS_F_FLAGS_NATIVE_CALL;
+		//	f->bradds_f_flags |= BRADDS_F_FLAGS_NATIVE_CALL;
 
             stack_pointer = sp;
             PUSH(res);
