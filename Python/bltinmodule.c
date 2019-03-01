@@ -402,6 +402,81 @@ PyDoc_STRVAR(record_create_doc,
 Create a \"command\" record - which will be a module - from a specified\n\
 definition record. ALPHA Not to be called directly.");
 
+
+static BradDs_UICB uiCB = 0;
+
+int		_BradDs_SetUICB ( BradDs_UICB CB ) 
+{
+	uiCB = CB;
+	return 0;
+}
+
+static PyObject *
+builtin_ui ( PyObject *self, PyObject *args, PyObject *kwds )
+{
+	//	Based on builtin___import__(). Really don't know for sure what I 
+	//	am doing here.  For now.
+
+	static char * kwlist[] = {"script", 0};
+	PyObject * script;
+
+    if ( ! PyArg_ParseTupleAndKeywords ( args, kwds, 
+										 "O:ui",
+										 kwlist, &script ) ) {
+	    if ( PyErr_Occurred() ) {
+			PyErr_Print();
+		}
+        return NULL; 
+	}
+
+	if ( ! uiCB )
+		return Py_None;
+	return uiCB ( script );
+}
+
+PyDoc_STRVAR(ui_doc,
+"ui(script) -> None\n\
+\n\
+Modify the user interface. script is expected to be a string representation of a dictionary of commands and arguments.");
+
+
+static BradDs_RobotCB robotCB = 0;
+
+int		_BradDs_SetRobotCB ( BradDs_RobotCB CB ) 
+{
+	robotCB = CB;
+	return 0;
+}
+
+static PyObject *
+builtin_robot ( PyObject *self, PyObject *args, PyObject *kwds )
+{
+	//	Based on builtin___import__(). Really don't know for sure what I 
+	//	am doing here.  For now.
+
+	static char * kwlist[] = {"script", 0};
+	PyObject * script;
+
+    if ( ! PyArg_ParseTupleAndKeywords ( args, kwds, 
+										 "O:robot",
+										 kwlist, &script ) ) {
+	    if ( PyErr_Occurred() ) {
+			PyErr_Print();
+		}
+        return NULL; 
+	}
+
+	if ( ! robotCB )
+		return Py_None;
+	return robotCB ( script );
+}
+
+PyDoc_STRVAR(robot_doc,
+"robot(script) -> None\n\
+\n\
+Run a robot related script. script is expected to be a string representation of a dictionary of commands and arguments.");
+
+
 /*[clinic input]
 abs as builtin_abs
 
@@ -2801,6 +2876,8 @@ static PyMethodDef builtin_methods[] = {
      METH_FASTCALL | METH_KEYWORDS, build_class_doc},
     {"__import__",        (PyCFunction)builtin___import__,        METH_VARARGS | METH_KEYWORDS, import_doc},
     {"__record_create__", (PyCFunction)builtin___record_create__, METH_VARARGS | METH_KEYWORDS, record_create_doc},
+    {"ui",    (PyCFunction)builtin_ui,    METH_VARARGS | METH_KEYWORDS, ui_doc},
+    {"robot", (PyCFunction)builtin_robot, METH_VARARGS | METH_KEYWORDS, robot_doc},
     BUILTIN_ABS_METHODDEF
     BUILTIN_ALL_METHODDEF
     BUILTIN_ANY_METHODDEF
