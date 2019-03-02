@@ -22,6 +22,13 @@ typedef PyObject * (* BradDs_UICB) ( PyObject * script );
 PyAPI_FUNC(int)	_BradDs_SetUICB ( BradDs_UICB );
 
 
+//	vp()		i.e., viewport
+//
+typedef PyObject * (* BradDs_VPCB) ( PyObject * script );
+
+PyAPI_FUNC(int)	_BradDs_SetVPCB ( BradDs_VPCB );
+
+
 //	robot()
 //
 typedef PyObject * (* BradDs_RobotCB) ( PyObject * script );

@@ -437,7 +437,44 @@ builtin_ui ( PyObject *self, PyObject *args, PyObject *kwds )
 PyDoc_STRVAR(ui_doc,
 "ui(script) -> None\n\
 \n\
-Modify the user interface. script is expected to be a string representation of a dictionary of commands and arguments.");
+Modify the user interface. script is expected to be a string representation of an array of one or more dictionaries each of which contains a command and zero or more arguments.");
+
+
+static BradDs_VPCB vpCB = 0;
+
+int		_BradDs_SetVPCB ( BradDs_VPCB CB ) 
+{
+	vpCB = CB;
+	return 0;
+}
+
+static PyObject *
+builtin_vp ( PyObject *self, PyObject *args, PyObject *kwds )
+{
+	//	Based on builtin___import__(). Really don't know for sure what I 
+	//	am doing here.  For now.
+
+	static char * kwlist[] = {"script", 0};
+	PyObject * script;
+
+    if ( ! PyArg_ParseTupleAndKeywords ( args, kwds, 
+										 "O:vp",
+										 kwlist, &script ) ) {
+	    if ( PyErr_Occurred() ) {
+			PyErr_Print();
+		}
+        return NULL; 
+	}
+
+	if ( ! vpCB )
+		return Py_None;
+	return vpCB ( script );
+}
+
+PyDoc_STRVAR(vp_doc,
+"vp(script) -> None\n\
+\n\
+Viewport commands. script is expected to be a string representation of an array of one or more dictionaries each of which contains a command and zero or more arguments.");
 
 
 static BradDs_RobotCB robotCB = 0;
@@ -474,7 +511,7 @@ builtin_robot ( PyObject *self, PyObject *args, PyObject *kwds )
 PyDoc_STRVAR(robot_doc,
 "robot(script) -> None\n\
 \n\
-Run a robot related script. script is expected to be a string representation of a dictionary of commands and arguments.");
+Run a robot related script. script is expected to be a string representation of an array of one or more dictionaries each of which contains a command and zero or more arguments.");
 
 
 /*[clinic input]
