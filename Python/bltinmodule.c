@@ -2914,6 +2914,7 @@ static PyMethodDef builtin_methods[] = {
     {"__import__",        (PyCFunction)builtin___import__,        METH_VARARGS | METH_KEYWORDS, import_doc},
     {"__record_create__", (PyCFunction)builtin___record_create__, METH_VARARGS | METH_KEYWORDS, record_create_doc},
     {"ui",    (PyCFunction)builtin_ui,    METH_VARARGS | METH_KEYWORDS, ui_doc},
+    {"vp",    (PyCFunction)builtin_vp,    METH_VARARGS | METH_KEYWORDS, vp_doc},
     {"robot", (PyCFunction)builtin_robot, METH_VARARGS | METH_KEYWORDS, robot_doc},
     BUILTIN_ABS_METHODDEF
     BUILTIN_ALL_METHODDEF
