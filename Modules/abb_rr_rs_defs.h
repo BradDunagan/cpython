@@ -23,6 +23,11 @@
 #endif	//	NDEBUG
 #endif	//	WIN32
 
+#ifndef _ASSERTE
+#define	_ASSERTE(cond)			\
+		assert(cond)
+#endif
+
 #ifdef	_ASSERTE
 #define	_ASSERTE_IF(cond)		\
 		_ASSERTE ( cond );		\
@@ -31,7 +36,6 @@
 #define	_ASSERTE_IF(cond)		\
 		if ( ! (cond) )
 #endif
-
 
 #define	MAX_COMPUTER_NAME_LEN	255
 
