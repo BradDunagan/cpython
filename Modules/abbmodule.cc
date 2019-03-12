@@ -26,7 +26,7 @@ static PyObject *
 spam_system ( PyObject * self, PyObject * args )
 {
 	const char *command;
-	int sts;
+	int sts = 0;
 
 	//  On errors - see -
 	//      https://docs.python.org/3/extending/extending.html#intermezzo-errors-and-exceptions
@@ -35,11 +35,11 @@ spam_system ( PyObject * self, PyObject * args )
 	//  ever.
 	if ( ! PyArg_ParseTuple ( args, "s", &command ) )
 		return NULL;
-	sts = system ( command );
-	if ( sts < 0 ) {
-		PyErr_SetString ( SpamError, "System command failed" );
-		return NULL;
-	}
+//	sts = system ( command );
+//	if ( sts < 0 ) {
+//		PyErr_SetString ( SpamError, "System command failed" );
+//		return NULL;
+//	}
 
 	RR_Test ( "Hello?", 42 );
 
