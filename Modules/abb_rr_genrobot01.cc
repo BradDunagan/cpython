@@ -713,24 +713,31 @@ int		CDGenRobot01::SetPaulJoint ( PECB *				pCB,
 {
 	int ENo = 0;	const char * sW = F("CDGenRobot01::SetPaulJoint()");
 
-	WorldEntA *	pWEA = 0;  int iWEA;
+	WorldEntPaul *	pWEP = 0;	int iWEP;
 
-	RbtMovCBData * pCBD = CreateCBD ( pCB, 1 );
+	RbtMovCBData * pCBD = CreateCBD ( pCB, 0, 1 );
 
-	pWEA = pCBD->pWEAV->pEnts;      iWEA = 0;
+	pWEP = pCBD->pWEPV->pEnts;      iWEP = 0;
 
-	pWEA[iWEA].A.SetPaulA ( pR->Theta[iJ], 
-							pR->Dist[iJ],
-							pR->Length[iJ],
-							pR->Alpha[iJ] );
+	pWEP[iWEP].Theta  = pR->Theta[iJ];
+	pWEP[iWEP].Dist   = pR->Dist[iJ];
+	pWEP[iWEP].Length = pR->Length[iJ];
+	pWEP[iWEP].Alpha  = pR->Alpha[iJ];
 
-	pWEA[iWEA].EId = pR->LinkId[iJ];
+	pWEP[iWEP].EId = pR->LinkId[iJ];
+
+	iWEP++;
+
+	pCBD->pWEPV->nEnts = iWEP;
 
 	pCB->iP = iP_NULL;		pCB->Cmd = PECB_SYNC_VPS3;
 							pCB->p   = pCBD;
-	pCBD  = 0;
 
-	if ( (ENo = pCB->CallBack ( pCB )) != 0 ) {
+	ENo = pCB->CallBack ( pCB );
+
+	delete pCBD;
+
+	if ( ENo ) {
 		return T ( ENo, sW ); }
 		
 	return 0;
@@ -1067,16 +1074,25 @@ void	CDGenRobot01::GetJoints2 ( SRGenRobot01_vXX * pR,
 }	//	CDGenRobot01::GetJoints2()
 
 
-RbtMovCBData *  CDGenRobot01::CreateCBD ( PECB * pCB, int MaxWEA ) 
+RbtMovCBData *  CDGenRobot01::CreateCBD ( PECB * pCB, int MaxWEA, int MaxWEP ) 
 {
 	RbtMovCBData * pCBD = new RbtMovCBData();
 
 	pCBD->PE_Id = pCB->PE_Id;
 
-	pCBD->pWEAV = new WEAVector();   
-	
-	pCBD->pWEAV->pEnts = new WorldEntA [MaxWEA];
-	pCBD->pWEAV->nEnts = 0;
+	if ( MaxWEA > 0 ) {
+		pCBD->pWEAV = new WEAVector();   
+		
+		pCBD->pWEAV->pEnts = new WorldEntA [MaxWEA];
+		pCBD->pWEAV->nEnts = 0;
+	}
+
+	if ( MaxWEP > 0 ) {
+		pCBD->pWEPV = new WEPVector();   
+		
+		pCBD->pWEPV->pEnts = new WorldEntPaul [MaxWEP];
+		pCBD->pWEPV->nEnts = 0;
+	}
 	
 	return pCBD;
 
@@ -1172,12 +1188,14 @@ void	CDGenRobot01::MoveOnPath ( PECB *				pCB,
 								   int					iJkL )
 {
 #define	MAX_WEA		32
+#define	MAX_WEP		32
 
 	int ENo = 0;	const char * sW = F("CDGenRobot01::MoveOnPath()");
 
 	int	iJ, iS;		BOOL bRotate[7];
 
-	WorldEntA *	pWEA = 0;  int iWEA;
+	WorldEntA *		pWEA = 0;	int iWEA;
+	WorldEntPaul *	pWEP = 0;	int iWEP;
 
 	CM4				CamEntS, CamEntA;		bool bGraspingCamera = false;	
 
@@ -1193,9 +1211,10 @@ void	CDGenRobot01::MoveOnPath ( PECB *				pCB,
 
 	//	2011-Jan-14, 18
 	//
-	RbtMovCBData * pCBD = CreateCBD ( pCB, MAX_WEA );
+	RbtMovCBData * pCBD = CreateCBD ( pCB, MAX_WEA, MAX_WEP );
 
 	pWEA = pCBD->pWEAV->pEnts;      iWEA = 0;
+	pWEP = pCBD->pWEPV->pEnts;		iWEP = 0;
 
 	bGraspingCamera =	 (	 (pR->GrspEntId > 0) 
 						  || (pR->GripOrgId > 0))
@@ -1210,7 +1229,7 @@ void	CDGenRobot01::MoveOnPath ( PECB *				pCB,
 	}
 
 
-	for ( iJ = iJk0; iJ <= iJkL; iJ++, iWEA++ )
+	for ( iJ = iJk0; iJ <= iJkL; iJ++, iWEA++, iWEP++ )
 	{
 		if ( bRotate[iJ - iJk0] )  pR->Theta[iJ] = pS->J[iJ - iJk0];
 		else
@@ -1220,10 +1239,15 @@ void	CDGenRobot01::MoveOnPath ( PECB *				pCB,
 								pR->Dist[iJ],
 								pR->Length[iJ],
 								pR->Alpha[iJ] );
+		pWEP[iWEP].Theta  = pR->Theta[iJ];
+		pWEP[iWEP].Dist	  = pR->Dist[iJ];
+		pWEP[iWEP].Length = pR->Length[iJ];
+		pWEP[iWEP].Alpha  = pR->Alpha[iJ];
 
 		if ( bGraspingCamera )  CamEntS = CamEntS * pWEA[iWEA].A;
 
 		pWEA[iWEA].EId = pR->LinkId[iJ];
+		pWEP[iWEP].EId = pR->LinkId[iJ];
 	}
 
 {	DiA0 * pA;		double G = pR->Gripper * DEG2PI;
@@ -1253,6 +1277,7 @@ void	CDGenRobot01::MoveOnPath ( PECB *				pCB,
 	//	2011-Jan-18		Viewport sets the entities.  See callback below.
 	//
 	pCBD->pWEAV->nEnts = iWEA;
+	pCBD->pWEPV->nEnts = iWEP;
 
 
 	//	2009-Jul-10		If grasped entity is a camera ...
@@ -1280,9 +1305,12 @@ void	CDGenRobot01::MoveOnPath ( PECB *				pCB,
 		//
 		pCB->iP = iP_NULL;		pCB->Cmd = PECB_SYNC_VPS3;
 								pCB->p   = pCBD;
-		pCBD  = 0;
 
-		if ( (ENo = pCB->CallBack ( pCB )) != 0 )  throw ENo;
+		ENo = pCB->CallBack ( pCB );
+		
+		delete pCBD;
+
+		if ( ENo )  throw ENo;
 
 	}	//	for ( iS; ... )
 

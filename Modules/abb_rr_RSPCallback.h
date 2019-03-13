@@ -21,10 +21,13 @@
 /*
 class	CProcEle3;
 */
+#ifdef	WIN32
 class	CSysEle2;
-
 class	CObjERCtrl;
-
+#else
+#define	CSysEle2	void
+#define	CObjERCtrl	void
+#endif
 
 
 //	2008-Jan-23		PE callback.

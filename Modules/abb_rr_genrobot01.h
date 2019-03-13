@@ -323,7 +323,7 @@ virtual ~CDGenRobot01();
 		void	GetJoints2 ( SRGenRobot01_vXX * pR, 
 							 int iJ1, int nJ, double J[] );
 
-		RbtMovCBData *	CreateCBD ( PECB * pCB, int MaxWEA );
+		RbtMovCBData *	CreateCBD ( PECB * pCB, int MaxWEA, int MaxWEP );
 
 
 		void	LARInProgress ( PECB *				pCB, 

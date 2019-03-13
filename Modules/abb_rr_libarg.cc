@@ -24,7 +24,7 @@
 
 
 /*-----------------------------  PECB::PECB()  -----------------------------*/
-/*d
+/*
 */
 PECB::PECB  ( int		PE_Id, 
 			  PECBFunc  CallBack, void * pPE, PECallback cbPE, CWnd * pWnd  )
@@ -49,7 +49,7 @@ PECB::PECB  ( int		PE_Id,
 
 
 /*-----------------------------  PECB::PECB()  -----------------------------*/
-/*d
+/*
 */
 PECB::PECB  ( int		PE_Id,   
 			  PECBFunc  CallBack, void * pPE, PECallback cbPE, CWnd * pWnd,
@@ -72,5 +72,6 @@ PECB::PECB  ( int		PE_Id,
 	this->ChgFlags = ChgFlags;
 
 }	//	PECB::PECB()
+
 
 

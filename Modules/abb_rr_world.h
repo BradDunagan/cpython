@@ -62,18 +62,43 @@ struct PORT	WEAVector
 
 };	//	WEAVector
 
+struct	WorldEntPaul
+{
+	LID		EId;
+
+	double	Theta, Dist, Length, Alpha;
+
+};	//	WorldEntPaul
+
+struct PORT	WEPVector
+{
+	WEPVector() { nEnts = 0;	pEnts = 0; }
+
+   ~WEPVector() { if ( pEnts )  delete [] pEnts; }
+
+	int		nEnts;
+
+	WorldEntPaul *	pEnts;
+
+};	//	WEPVector
 
 //	2011-Feb-21
 //
 struct PORT RbtMovCBData
 {
-	RbtMovCBData() { PE_Id = 0;	pWEAV = 0;	pAFR = 0; }
+	RbtMovCBData() { PE_Id = 0;	pWEAV = 0;	pWEPV = 0;  pAFR = 0; }
 
-   ~RbtMovCBData() { if ( pWEAV )  delete pWEAV;	if ( pAFR )  delete pAFR; }
+   ~RbtMovCBData() { 
+	   if ( pWEAV )  delete pWEAV;
+	   if ( pWEPV )  delete pWEPV;
+	   if ( pAFR )  delete pAFR; 
+	}
 
    int			PE_Id;
 
 	WEAVector *	pWEAV;
+
+	WEPVector * pWEPV;
 
 	VP_AFR *	pAFR;
 
