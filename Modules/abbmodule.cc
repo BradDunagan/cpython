@@ -78,6 +78,8 @@ static int	CBFnc ( PECB * pCB )
 			iC += nC;
 		}
 
+		if ( nEnts > 0 ) {
+			iC -= 1; }		//	to overwrite the last comma
 		nC = snprintf ( &msg[iC], sizeof(msg) - iC - 1, "]}" );
 		if ( nC < 0 ) {
 			printf ( "CBFnc() msg[] is too small" );
