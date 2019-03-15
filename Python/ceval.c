@@ -3777,6 +3777,9 @@ _BradDs_PyEval_EvalFrameDefault ( PyFrameObject *f, int throwflag,
     assert(stack_pointer != NULL);
     f->f_stacktop = NULL;       /* remains NULL unless yield suspends frame */
     f->f_executing = 1;
+
+    PyObject ** bradds_start_stack_pointer = stack_pointer;
+    
     /*
        f->f_lasti refers to the index of the last instruction,
        unless it's -1 in which case next_instr should be first_instr.
@@ -6063,10 +6066,17 @@ main_loop:
 				Py_INCREF(retval);
 				NO_STACK_RETURN(); }
 			
-			if ( res && f->bradds_f_flags & BRADDS_F_FLAGS_CREATE_RECORD ) {
+			if (    res 
+                 && (   (f->bradds_f_flags & BRADDS_F_FLAGS_CREATE_RECORD)
+                     || (f->bradds_f_flags & BRADDS_F_FLAGS_UI_CALL)
+                     || (f->bradds_f_flags & BRADDS_F_FLAGS_VP_CALL)) ) {
 				retval = res;
-				JUMPBACK(2);				//	to execute the statement again
-				Py_INCREF(retval);
+
+			//	JUMPBACK(2);				//	to execute the statement again
+				JUMPBACK(6);				//	to execute the statement again
+				stack_pointer = bradds_start_stack_pointer;
+
+                Py_INCREF(retval);
 				NO_STACK_RETURN(); }
 
 		//	f->bradds_f_flags |= BRADDS_F_FLAGS_NATIVE_CALL;
