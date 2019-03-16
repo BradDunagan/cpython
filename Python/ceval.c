@@ -3823,6 +3823,8 @@ _BradDs_PyEval_EvalFrameDefault ( PyFrameObject *f, int throwflag,
 			next_instr = f->bradds_f_next_instr;
 	}
 
+    //  First instruction of this statement.
+//  int bradds_start_instr = next_instr - first_instr;
 
 #ifdef LLTRACE
     lltrace = _PyDict_GetItemId(f->f_globals, &PyId___ltrace__) != NULL;
@@ -3939,7 +3941,14 @@ main_loop:
 
         /* Extract opcode and argument */
 
-        NEXTOPARG();
+    //  NEXTOPARG();
+        do { 
+            _Py_CODEUNIT word = *next_instr; 
+            opcode = _Py_OPCODE(word); 
+            oparg = _Py_OPARG(word); 
+            next_instr++; 
+        } while (0);
+
     dispatch_opcode:
 
 #ifdef LLTRACE
@@ -6073,7 +6082,11 @@ main_loop:
 				retval = res;
 
 			//	JUMPBACK(2);				//	to execute the statement again
-				JUMPBACK(6);				//	to execute the statement again
+			//	JUMPBACK(6);				//	to execute the statement again
+            //  JUMP(bradds_start_instr);
+            //  The instruction pointer is now set by the caller in this 
+            //  case.
+
 				stack_pointer = bradds_start_stack_pointer;
 
                 Py_INCREF(retval);
