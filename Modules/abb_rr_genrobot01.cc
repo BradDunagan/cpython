@@ -56,6 +56,17 @@
 #define	F(f)	"(" __FILE__ ")" "  " f
 
 
+
+extern "C"
+{
+PORT int Test_InvKin ( const double Tgt[], double JCur[], double JNew[] );
+
+PORT int InvKin ( const double Tgt[], double JCur[], 
+                                      double JNew[][2], double MaxDelta, 
+                                      int     Odr[] );
+}
+
+
 /*---------------------------------------------------------------------------*/
 /*                                                                           */
 /*                                GenRobot01                                 */
@@ -277,13 +288,15 @@ int		CDGenRobot01::ConfigureLink ( PECB * pCB,
 */
 int		CDGenRobot01::MovRbtTo ( PECB * 	pCB, 
 								 P6 * 		pB6, 	//	Base WRT system
-								 P6 * 		pL6, 	//	Last link WRT system
+						//		 P6 * 		pL6, 	//	Last link WRT system
 								 CM4 * 		pPs, 	//	Last link target WRT system
 								 MovToRtn & Rtn )
 {
 #define	MAX_ITb		16
 
 	int	ENo = 0;	const char * sW = F("CDGenRobot01::MovRbtTo()");
+
+	DL = 0;
 
 	int		iJk0 = -1;		//	First joint (of the arrary of joints) to be 
 							//	inverse kinematically solved.
@@ -355,7 +368,8 @@ int		CDGenRobot01::MovRbtTo ( PECB * 	pCB,
 		//	Get current and target position of last link WRT base.
 		//
 	//	CM4	Cb, Tb;		CM4	Ls = pW->GetS ( pR->LinkId[pR->nJoints - 1] );
-		CM4	Cb, Tb;		CM4	Ls;	Ls.GetRT ( pL6 );
+	//	CM4	Cb, Tb;		CM4	Ls;	Ls.GetRT ( pL6 );
+		CM4	Cb, Tb;		CM4	Ls = GetLastLinkS ( pR );
 		
 		Get_Cb_Tb ( *pPs, Ls, pR, Cb, Tb );
 
@@ -485,7 +499,8 @@ int		CDGenRobot01::MovRbtTo ( PECB * 	pCB,
 				pPath->nS = 0;
 
 			//	pPath->Es = pW->GetS ( pR->LinkId[pR->nJoints - 1] );
-				pPath->Es.GetRT ( pL6 );
+			//	pPath->Es.GetRT ( pL6 );
+				pPath->Es = GetLastLinkS ( pR );
 
 			//	pPath->Sb.Set ( Cb.GetX(), Cb.GetY(), Cb.GetZ() );
 
@@ -557,7 +572,8 @@ int		CDGenRobot01::MovRbtTo ( PECB * 	pCB,
 				//	System position of the last link.
 				//
 			//	pPath->Es = pW->GetS ( pR->LinkId[iJkL - 1] );
-				pPath->Es.GetRT ( pL6 );
+			//	pPath->Es.GetRT ( pL6 );
+				pPath->Es = GetLastLinkS ( pR );
 
 				CM4	A;	A.SetPaulA ( pR->Theta[iJkL], 
 									 pR->Dist[iJkL],
@@ -988,7 +1004,7 @@ void	CDGenRobot01::ZeroEverything()
 
 	bDiagsOn = TRUE;		DL = D4;			StepCnt = 0;
 
-	IKFunc = 0;
+	IKFunc = ::InvKin;
 
 	bTryingSingularity = false;
 
@@ -997,6 +1013,9 @@ void	CDGenRobot01::ZeroEverything()
 	nRecalls = 0;
 
 	bSingularity = false;
+
+	for ( int i = 0; i < GR01_MAX_JOINTS; i++ ) {
+		Odr[i] = 0; }
 
 }	//	CDGenRobot01::ZeroEverything()
 
@@ -1028,7 +1047,64 @@ SRGenRobot01_vXX *	CDGenRobot01::Get()
 {
 	if ( ! pRD ) {
 		pRD = new SRGenRobot01_vXX(); 
-		memset ( pRD, 0, sizeof(SRGenRobot01_vXX) ); }
+		memset ( pRD, 0, sizeof(SRGenRobot01_vXX) ); 
+	
+		int	i;
+
+		//	Initialize this record.
+		//
+		pRD->BaseId = 0;
+
+		for ( i = 0; i < GR01_MAX_JOINTS; i++ )  
+		{
+			pRD->LinkId[i] = 0;		pRD->LinkA0[i].Reset();
+		}
+
+		pRD->Finger1Id = 0;		pRD->Finger1A0.Reset();
+		pRD->Finger2Id = 0;		pRD->Finger2A0.Reset();
+		pRD->GripOrgId = 0;		pRD->GripOrgA0.Reset();
+		pRD->GrspEntId = 0;		pRD->GrspEntA0.Reset();
+
+		pRD->nJoints = 7;
+
+		//	Paul parameters.
+		//
+		for ( i = 0; i < GR01_MAX_JOINTS; i++ )
+		{
+			pRD->JType[i]  = jtUndefined;
+
+			pRD->Theta[i]  = 0;
+			pRD->Length[i] = 0;
+			pRD->Dist[i]   = 0;
+			pRD->Alpha[i]  = 0;
+		}
+
+		pRD->Reach = 0;				//	Max distance from base to last link.
+
+		//	Gripper
+		//
+		pRD->Gripper = 0;
+
+		pRD->GAx = pRD->GAy = pRD->GAz = 0;
+
+		//	Joint limits.
+		//
+		for ( i = 0; i < GR01_MAX_JOINTS; i++ ) 
+		{
+			pRD->JointLimit[i][0] = (-360.0 * DEG2PI);
+			pRD->JointLimit[i][1] = ( 360.0 * DEG2PI);
+		}
+
+		pRD->GripperLimit[0] =  0.00;
+		pRD->GripperLimit[1] =  4.00;
+
+
+		pRD->K = kSymKin;			//	Kinematics function.
+
+		FVs.Kinematics = &CDGenRobot01::KPaul03_RPPaul;
+
+		memset ( pRD->IKModName, 0, sizeof(pRD->IKModName) );
+	}
 
 	return pRD;
 
@@ -1318,6 +1394,37 @@ void	CDGenRobot01::MoveOnPath ( PECB *				pCB,
 #undef	MAX_WEA
 
 }	//	CDGenRobot01::MoveOnPath()
+
+
+CM4		CDGenRobot01::GetLastLinkS ( SRGenRobot01_vXX * pR )
+{
+	int		iJk0 = -1;		//	First joint (of the arrary of joints) to be 
+							//	inverse kinematically solved.
+	int		iJkL = -1;		//	Last of such joints.
+
+	int		iJ;
+
+	GetIKJoints ( pR, iJk0, iJkL );
+
+	CM4	Ps;
+
+	for ( iJ = iJk0; iJ <= iJkL; iJ++ )
+	{
+		CM4	A;	A.SetPaulA ( pR->Theta[iJ],
+							 pR->Dist[iJ],
+							 pR->Length[iJ],
+							 pR->Alpha[iJ] );
+
+		if ( iJ == iJk0 ) {
+			Ps = A;
+			continue; }
+
+		Ps = Ps * A;
+	}
+
+	return Ps;
+
+}	//	CDGenRobot01::GetLastLinkS()
 
 
 //	GenRobot01.cpp

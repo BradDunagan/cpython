@@ -39,7 +39,7 @@
 bool	CDGenRobot01::TryBoth ( CM4 & T, CM4 & G, CM4 A[], CM4 & B, 
 								BOOL   bRotate[],
 								double JNewR[][2], int Odr[], int Jn,
-				  InvKin IKFnc, double JCurR[],    double MaxDelta,
+			  InvKinFunc IKFnc, double JCurR[],    double MaxDelta,
 								double J_BAF[] )	//	Best And Final
 {
 	const char * sW = "both";	//	F("CDGenRobot01::TryBoth()");

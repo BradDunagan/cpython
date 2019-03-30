@@ -193,6 +193,44 @@ abb_configure_link ( PyObject * self, PyObject * args )
 }	//	abb_configure_link()
 
 
+static PyObject *
+abb_mov_to ( PyObject * self, PyObject * args )
+{
+	PyObject * O_Bs;	P6 	Bs; 	//	Base WRT system
+//	PyObject * O_Ls; 	P6	Ls; 	//	Last link WRT system
+	PyObject * O_Ts;	P6 	Ts; 	//	Last link target WRT system
+	
+//	if ( ! PyArg_ParseTuple ( args, "OOO:mov_to", 
+//							  &O_Bs, &O_Ls, &O_Ts ) ) {
+	if ( ! PyArg_ParseTuple ( args,  "OO:mov_to", 
+							  &O_Bs,        &O_Ts ) ) {
+		return NULL; }
+
+	if ( ! PyArg_ParseTuple ( O_Bs, "dddddd:mov_toBs", 
+							  &Bs.Px, &Bs.Py, &Bs.Pz, 
+							  &Bs.Ax, &Bs.Ay, &Bs.Az ) ) {
+		return NULL; }
+
+//	if ( ! PyArg_ParseTuple ( O_Ls, "dddddd:mov_toLs", 
+//							  &Ls.Px, &Ls.Py, &Ls.Pz, 
+//							  &Ls.Ax, &Ls.Ay, &Ls.Az ) ) {
+//		return NULL; }
+
+	if ( ! PyArg_ParseTuple ( O_Ts, "dddddd:mov_toTs", 
+							  &Ts.Px, &Ts.Py, &Ts.Pz, 
+							  &Ts.Ax, &Ts.Ay, &Ts.Az ) ) {
+		return NULL; }
+
+	PECB	CB ( 1, CBFnc, 0, 0, 0 );
+
+//	MovTo ( &CB, &Bs, &Ls, &Ts );
+	MovTo ( &CB, &Bs,      &Ts );
+
+	return PyLong_FromLong ( 0 );
+
+}	//	abb_mov_to()
+
+
 static PyMethodDef SpamMethods[] = {
 //	...
 	{"system",  spam_system, METH_VARARGS,
@@ -202,6 +240,9 @@ static PyMethodDef SpamMethods[] = {
 		
 	{ "configure_link", abb_configure_link, METH_VARARGS,
 		"Define the kinematics of a robot arm link."},
+		
+	{ "mov_to", abb_mov_to, METH_VARARGS,
+		"Move the robot grasp position in system coordinates."},
 //	...
 	{NULL, NULL, 0, NULL}        /* Sentinel */
 };

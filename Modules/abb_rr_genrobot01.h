@@ -156,9 +156,9 @@ struct	MvPath
 };
 
 
-typedef int (* InvKin)( const double Tgt[], double JCur[], 
-											double JNew[][2], double MaxDelta,
-											int     Odr[] );
+typedef int (* InvKinFunc)( const double Tgt[], double JCur[], 
+						 		  double JNew[][2], double MaxDelta,
+								  int     Odr[] );
 
 /*-------------------------  class  CDGenRobot01  --------------------------*/
 /*
@@ -242,7 +242,7 @@ virtual ~CDGenRobot01();
 		//
 		int		MovRbtTo ( PECB * 		pCB, 
 						   P6 * 		pB6, 	//	Base WRT system
-						   P6 * 		pL6, 	//	Last link WRT system
+					//	   P6 * 		pL6, 	//	Last link WRT system
 						   CM4 * 		pPs, 	//	Last link target WRT system
 						   MovToRtn & 	Rtn );
 
@@ -286,7 +286,7 @@ virtual ~CDGenRobot01();
 
 		SRGenRobot01_vXX *  pRD;
 
-		InvKin		IKFunc;				//	Inverse kinematics function in
+		InvKinFunc	IKFunc;				//	Inverse kinematics function in
 										//	the DLL built by the SymKin
 		bool		bTryingSingularity;	//	routines.
 
@@ -301,8 +301,9 @@ virtual ~CDGenRobot01();
 		int			nResidErrors;		//	Number of times the residual test 
 										//	failed.
 
-		int			nRecalls;			//	Number of times InvKin() is called 
-										//	again to get an alternate solution.
+		int			nRecalls;			//	Number of times InvKinFunc() is 
+										//	called again to get an alternate 
+										//	solution.
 
 		bool		bSingularity;		//	Set true when the solution was 
 										//	found by relaxing the joint change 
@@ -362,7 +363,7 @@ virtual ~CDGenRobot01();
 		bool	TryBoth ( CM4 & T, CM4 & G, CM4 A[], CM4 & B, 
 						  BOOL   bRotate[],
 						  double JNewR[][2], int  Odr[], int Jn,
-						  InvKin IKFnc,		 double JCurR[], double MaxDelta,
+						  InvKinFunc IKFnc,		 double JCurR[], double MaxDelta,
 											 double J_BAF[] );
 
 
@@ -388,6 +389,8 @@ virtual ~CDGenRobot01();
 									   double				SSF,
 									   MovToRtn &			Rtn,
 									   int &				iJointLimit );
+
+		CM4		GetLastLinkS ( SRGenRobot01_vXX * pR );
 
 };	//	class	CDGenRobot01
 

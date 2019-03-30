@@ -1,6 +1,7 @@
 
 #include    "abb_rr_libarg.h"
 
+struct	P6;
 
 //extern "C"
 //{
@@ -29,6 +30,10 @@ int		ConfigureLink ( PECB *		pCB,
 						double		Dist,
 						double		Length,
 						double		Alpha );
+
+int		MovTo ( PECB * pCB, P6 * 	pB6, 	//	Base WRT system
+					//	    P6 * 	pL6, 	//	Last link WRT system
+						    P6 * 	pPs ); 	//	Last link target WRT system
 //}
 
 
