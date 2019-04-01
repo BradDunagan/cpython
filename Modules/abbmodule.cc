@@ -107,7 +107,7 @@ static int	CBFnc ( PECB * pCB )
 			
 			nC = snprintf ( &msg[iC], sizeof(msg) - iC - 1, 
 							"{\"EId\": %d, "
-							"\"J\": %f}, ",
+							"\"J\": %f},",
 							pEnt->EId, pEnt->J );
 			if ( nC < 0 ) {
 				printf ( "CBFnc() msg[] is too small" );
