@@ -296,7 +296,7 @@ int		CDGenRobot01::MovRbtTo ( PECB * 	pCB,
 
 	int	ENo = 0;	const char * sW = F("CDGenRobot01::MovRbtTo()");
 
-	DL = 0;
+	DL = 4;
 
 	int		iJk0 = -1;		//	First joint (of the arrary of joints) to be 
 							//	inverse kinematically solved.
@@ -630,7 +630,9 @@ int		CDGenRobot01::MovRbtTo ( PECB * 	pCB,
 				//	Now all the joint solutions for this segment of the move,
 				//	do the move.
 
-				MoveOnPath ( pCB, pR, iJk0, iJkL );
+			//	MoveOnPath ( pCB, pR, iJk0, iJkL );
+				//	Just send joint values.
+				MoveOnPath_j ( pCB, pR, iJk0, iJkL );
 				
 				//	It might be important to let diagnostics flush so that
 				//	the cmd record does not get to the next mov command before
@@ -1175,6 +1177,24 @@ RbtMovCBData *  CDGenRobot01::CreateCBD ( PECB * pCB, int MaxWEA, int MaxWEP )
 }   //  CDGenRobot01::CreateCBD()
 
 
+RbtMovCBData_j *  CDGenRobot01::CreateCBD_j ( PECB * pCB, int MaxWEJ )
+{
+	RbtMovCBData_j * pCBD = new RbtMovCBData_j();
+
+	pCBD->PE_Id = pCB->PE_Id;
+
+	if ( MaxWEJ > 0 ) {
+		pCBD->pWEJ = new WEJVector();   
+		
+		pCBD->pWEJ->pEnts = new WorldEntJoint [MaxWEJ];
+		pCBD->pWEJ->nEnts = 0;
+	}
+	
+	return pCBD;
+
+}   //  CDGenRobot01::CreateCBD_j()
+
+
 /*--------------------  CDGenRobot01::LARInProgress()  -----------------------*/
 /*
 */
@@ -1301,7 +1321,7 @@ void	CDGenRobot01::MoveOnPath ( PECB *				pCB,
 	//	CamEntS = pW->GetS ( pR->BaseId );
 	//
 	//	CamEntA = pW->GetA ( pR->GrspEntId );
-		throw E ( sW, "Not ready for cameara" );
+		throw E ( sW, "Not ready for camera" );
 	}
 
 
@@ -1394,6 +1414,70 @@ void	CDGenRobot01::MoveOnPath ( PECB *				pCB,
 #undef	MAX_WEA
 
 }	//	CDGenRobot01::MoveOnPath()
+
+
+/*----------------------  CDGenRobot01::MoveOnPath_j()  ----------------------*/
+/*
+*/
+void	CDGenRobot01::MoveOnPath_j ( PECB *				pCB, 
+									 SRGenRobot01_vXX *	pR, 
+								     int				iJk0, 
+								     int				iJkL )
+{
+#define	MAX_WEJ		32
+
+	int ENo = 0;
+
+	int	iJ, iS;		BOOL bRotate[7];
+
+	WorldEntJoint *	pWEJ = 0;	int iWEJ;
+
+	for ( iJ = iJk0; iJ <= iJkL; iJ++ )
+	{
+		bRotate[iJ-iJk0] = (((int)pR->JType[iJ] & (int)jtRotating) != 0);
+	}
+
+
+	for ( iS = 0; iS < pPath->nS; iS++ )
+	{
+		MvSln * pS = &pPath->pS[iS];
+
+	//	2011-Jan-14, 18
+	//
+	RbtMovCBData_j * pCBD = CreateCBD_j ( pCB, MAX_WEJ );
+
+	pWEJ = pCBD->pWEJ->pEnts;		iWEJ = 0;
+
+	for ( iJ = iJk0; iJ <= iJkL; iJ++, iWEJ++ )
+	{
+		if ( bRotate[iJ - iJk0] ) {
+			pWEJ[iWEJ].J = pR->Theta[iJ] = pS->J[iJ - iJk0]; }
+		else {
+			pWEJ[iWEJ].J = pR->Dist[iJ] = pS->J[iJ-iJk0]; }
+
+		pWEJ[iWEJ].EId = pR->LinkId[iJ];
+	}
+
+	pCBD->pWEJ->nEnts = iWEJ;
+
+
+		//	2011-Jan-18		Trying a FIFO.
+		//
+		pCB->iP = iP_NULL;		pCB->Cmd = PECB_JOINTS;
+								pCB->p   = pCBD;
+
+		ENo = pCB->CallBack ( pCB );
+		
+		delete pCBD;
+
+		if ( ENo )  throw ENo;
+
+	}	//	for ( iS; ... )
+
+
+#undef	MAX_WEJ
+
+}	//	CDGenRobot01::MoveOnPath_j()
 
 
 CM4		CDGenRobot01::GetLastLinkS ( SRGenRobot01_vXX * pR )

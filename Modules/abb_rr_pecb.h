@@ -103,6 +103,8 @@ class	CWnd;
 #define	PECB_BIL_CALLBACK	0x00010000
 
 
+#define	PECB_JOINTS			0x00020000
+
 
 //	PECB Flags
 //

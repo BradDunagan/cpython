@@ -45,6 +45,8 @@ struct	VP_AFR;
 
 struct	RbtMovCBData;
 
+struct	RbtMovCBData_j;
+
 
 //	Bits set in the order word.
 //
@@ -327,6 +329,9 @@ virtual ~CDGenRobot01();
 		RbtMovCBData *	CreateCBD ( PECB * pCB, int MaxWEA, int MaxWEP );
 
 
+		RbtMovCBData_j *	CreateCBD_j ( PECB * pCB, int MaxWEJ );
+
+
 		void	LARInProgress ( PECB *				pCB, 
 								SRGenRobot01_vXX *	pR, 
 								int					iJk0, 
@@ -340,6 +345,13 @@ virtual ~CDGenRobot01();
 							 SRGenRobot01_vXX *	pR,  
 							 int				iJk0, 
 							 int				iJkL );
+
+
+		void	MoveOnPath_j ( PECB *				pCB, 
+							   SRGenRobot01_vXX *	pR,  
+							   int					iJk0, 
+							   int					iJkL );
+
 
 		//	In FIP.cpp
 		//

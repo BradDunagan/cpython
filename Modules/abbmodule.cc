@@ -89,6 +89,43 @@ static int	CBFnc ( PECB * pCB )
 		abbCallback->callback ( msg );
 	}
 
+	if ( pCB->Cmd == PECB_JOINTS ) {
+
+		RbtMovCBData_j * pCBD = (RbtMovCBData_j *)pCB->p;
+
+		nC = snprintf ( &msg[iC], sizeof(msg) - iC - 1, 
+						"{\"cmd\": \"PECB_JOINTS\", \"ents\": [" );
+		if ( nC < 0 ) {
+			printf ( "CBFnc() msg[] is too small" );
+			return -1; }
+		iC += nC;
+
+		int nEnts = pCBD->pWEJ ? pCBD->pWEJ->nEnts : 0;
+
+		for ( i = 0; i < nEnts; i++ ) {
+			WorldEntJoint * pEnt = &pCBD->pWEJ->pEnts[i];
+			
+			nC = snprintf ( &msg[iC], sizeof(msg) - iC - 1, 
+							"{\"EId\": %d, "
+							"\"J\": %f}, ",
+							pEnt->EId, pEnt->J );
+			if ( nC < 0 ) {
+				printf ( "CBFnc() msg[] is too small" );
+				return -1; }
+			iC += nC;
+		}
+
+		if ( nEnts > 0 ) {
+			iC -= 1; }		//	to overwrite the last comma
+		nC = snprintf ( &msg[iC], sizeof(msg) - iC - 1, "]}" );
+		if ( nC < 0 ) {
+			printf ( "CBFnc() msg[] is too small" );
+			return -1; }
+		iC += nC;
+
+		abbCallback->callback ( msg );
+	}
+
 	return 0;
 
 }	//	CBFnc()

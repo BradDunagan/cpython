@@ -105,6 +105,42 @@ struct PORT RbtMovCBData
 };	//	RbtMovCBData
 
 
+struct WorldEntJoint
+{
+	LID		EId;
+
+	double	J;
+
+};	//	WorldEntJoint
+
+struct PORT WEJVector
+{
+	WEJVector() { nEnts = 0;	pEnts = 0; }
+
+   ~WEJVector() { if ( pEnts )  delete [] pEnts; }
+
+	int		nEnts;
+
+	WorldEntJoint *	pEnts;
+
+};	//	WEJVector
+
+struct PORT RbtMovCBData_j
+{
+	RbtMovCBData_j() { PE_Id = 0; pWEJ = 0; }
+
+   ~RbtMovCBData_j() {
+		if ( pWEJ ) {
+			delete pWEJ; }
+	}
+
+	int			PE_Id;
+
+	WEJVector *	pWEJ;
+
+};	//	RbtMovCBData_j
+
+
 #endif
 
 //  world.h
