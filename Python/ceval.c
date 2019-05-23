@@ -6033,8 +6033,19 @@ main_loop:
                    `callable` will be POPed by call_function.
                    NULL will will be POPed manually later.
                 */
+				//	bradd - similar to CALL_FUNCTION
+            	f->bradds_f_flags |=  BRADDS_F_FLAGS_CALL_FUNCTION;
                 res = call_function(&sp, oparg, NULL);
-                stack_pointer = sp;
+            	f->bradds_f_flags &= ~BRADDS_F_FLAGS_CALL_FUNCTION;
+
+   				if ( res && f->bradds_f_flags & BRADDS_F_FLAGS_NEW_FRAME ) {
+                	(void)POP(); /* POP the NULL. */
+					f->bradds_f_oparg = oparg;
+					retval = res;			//	this should be the new frame
+					Py_INCREF(retval);
+					NO_STACK_RETURN(); }
+				
+	            stack_pointer = sp;
                 (void)POP(); /* POP the NULL. */
             }
             else {
@@ -6503,7 +6514,9 @@ exit_eval_frame:
 
 		while ((pp_stack) > pfunc) {
 			PyObject * w = EXT_POP(pp_stack);
-			Py_DECREF(w);
+			//	LOAD_METHOD may set entry at the top of the stack NULL.
+			if ( w != NULL ) {
+				Py_DECREF(w); }
 		}
 
 		/*	As a first approximation, I think thats it.
