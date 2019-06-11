@@ -477,6 +477,43 @@ PyDoc_STRVAR(vp_doc,
 Viewport commands. script is expected to be a string representation of an array of one or more dictionaries each of which contains a command and zero or more arguments.");
 
 
+static BradDs_WorldCB worldCB = 0;
+
+int		_BradDs_SetWorldCB ( BradDs_WorldCB CB ) 
+{
+	worldCB = CB;
+	return 0;
+}
+
+static PyObject *
+builtin_world ( PyObject *self, PyObject *args, PyObject *kwds )
+{
+	//	Based on builtin___import__(). Really don't know for sure what I 
+	//	am doing here.  For now.
+
+	static char * kwlist[] = {"script", 0};
+	PyObject * script;
+
+    if ( ! PyArg_ParseTupleAndKeywords ( args, kwds, 
+										 "O:world",
+										 kwlist, &script ) ) {
+	    if ( PyErr_Occurred() ) {
+			PyErr_Print();
+		}
+        return NULL; 
+	}
+
+	if ( ! worldCB )
+		return Py_None;
+	return worldCB ( script );
+}
+
+PyDoc_STRVAR(world_doc,
+"world(script) -> list\n\
+\n\
+World commands. script is expected to be a string representation of an array of one or more dictionaries each of which contains a command and zero or more arguments.");
+
+
 static BradDs_RobotCB robotCB = 0;
 
 int		_BradDs_SetRobotCB ( BradDs_RobotCB CB ) 
@@ -2915,6 +2952,7 @@ static PyMethodDef builtin_methods[] = {
     {"__record_create__", (PyCFunction)builtin___record_create__, METH_VARARGS | METH_KEYWORDS, record_create_doc},
     {"ui",    (PyCFunction)builtin_ui,    METH_VARARGS | METH_KEYWORDS, ui_doc},
     {"vp",    (PyCFunction)builtin_vp,    METH_VARARGS | METH_KEYWORDS, vp_doc},
+	{"world", (PyCFunction)builtin_world, METH_VARARGS | METH_KEYWORDS, world_doc},
     {"robot", (PyCFunction)builtin_robot, METH_VARARGS | METH_KEYWORDS, robot_doc},
     BUILTIN_ABS_METHODDEF
     BUILTIN_ALL_METHODDEF

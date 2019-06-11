@@ -29,6 +29,13 @@ typedef PyObject * (* BradDs_VPCB) ( PyObject * script );
 PyAPI_FUNC(int)	_BradDs_SetVPCB ( BradDs_VPCB );
 
 
+//	world()
+//
+typedef PyObject * (* BradDs_WorldCB) ( PyObject * script );
+
+PyAPI_FUNC(int)	_BradDs_SetWorldCB ( BradDs_WorldCB );
+
+
 //	robot()
 //
 typedef PyObject * (* BradDs_RobotCB) ( PyObject * script );

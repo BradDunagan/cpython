@@ -28,6 +28,7 @@ typedef struct {
 #define BRADDS_F_FLAGS_CREATE_RECORD	0x00000080
 #define BRADDS_F_FLAGS_UI_CALL			0x00000100
 #define BRADDS_F_FLAGS_VP_CALL			0x00000200
+#define	BRADDS_F_FLAGS_WORLD_CALL		0x00000400
 
 typedef struct _frame {
 	PyObject_VAR_HEAD
