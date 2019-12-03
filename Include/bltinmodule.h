@@ -15,6 +15,13 @@ typedef PyObject * (* BradDs_CreateRecordCB) ( PyObject * def_name,
 PyAPI_FUNC(int)	_BradDs_SetCreateRecordCB ( BradDs_CreateRecordCB );
 
 
+//	pe()		e.g., cmd: 'new-record', ...
+//
+typedef PyObject * (* BradDs_PECB) ( PyObject * script );
+
+PyAPI_FUNC(int)	_BradDs_SetPECB ( BradDs_PECB );
+
+
 //	ui()
 //
 typedef PyObject * (* BradDs_UICB) ( PyObject * script );

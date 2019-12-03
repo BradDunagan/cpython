@@ -403,6 +403,47 @@ Create a \"command\" record - which will be a module - from a specified\n\
 definition record. ALPHA Not to be called directly.");
 
 
+
+
+
+
+static BradDs_PECB peCB = 0;
+
+int		_BradDs_SetPECB ( BradDs_PECB CB ) 
+{
+	peCB = CB;
+	return 0;
+}
+
+static PyObject *
+builtin_pe ( PyObject *self, PyObject *args, PyObject *kwds )
+{
+	//	Based on builtin___import__(). Really don't know for sure what I 
+	//	am doing here.  For now.
+
+	static char * kwlist[] = {"script", 0};
+	PyObject * script;
+
+    if ( ! PyArg_ParseTupleAndKeywords ( args, kwds, 
+										 "O:pe",
+										 kwlist, &script ) ) {
+	    if ( PyErr_Occurred() ) {
+			PyErr_Print();
+		}
+        return NULL; 
+	}
+
+	if ( ! peCB )
+		return Py_None;
+	return peCB ( script );
+}
+
+PyDoc_STRVAR(pe_doc,
+"pe(script) -> None\n\
+\n\
+Execute a process command. script is expected to be a string representation of an array of one or more dictionaries each of which contains a command and zero or more arguments.");
+
+
 static BradDs_UICB uiCB = 0;
 
 int		_BradDs_SetUICB ( BradDs_UICB CB ) 
@@ -2950,6 +2991,7 @@ static PyMethodDef builtin_methods[] = {
      METH_FASTCALL | METH_KEYWORDS, build_class_doc},
     {"__import__",        (PyCFunction)builtin___import__,        METH_VARARGS | METH_KEYWORDS, import_doc},
     {"__record_create__", (PyCFunction)builtin___record_create__, METH_VARARGS | METH_KEYWORDS, record_create_doc},
+    {"pe",    (PyCFunction)builtin_pe,    METH_VARARGS | METH_KEYWORDS, pe_doc},
     {"ui",    (PyCFunction)builtin_ui,    METH_VARARGS | METH_KEYWORDS, ui_doc},
     {"vp",    (PyCFunction)builtin_vp,    METH_VARARGS | METH_KEYWORDS, vp_doc},
 	{"world", (PyCFunction)builtin_world, METH_VARARGS | METH_KEYWORDS, world_doc},

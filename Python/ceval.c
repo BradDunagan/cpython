@@ -6088,6 +6088,7 @@ main_loop:
 			
 			if (    res 
                  && (   (f->bradds_f_flags & BRADDS_F_FLAGS_CREATE_RECORD)
+					 || (f->bradds_f_flags & BRADDS_F_FLAGS_PE_CALL)
                      || (f->bradds_f_flags & BRADDS_F_FLAGS_UI_CALL)
                      || (f->bradds_f_flags & BRADDS_F_FLAGS_VP_CALL)
 					 || (f->bradds_f_flags & BRADDS_F_FLAGS_WORLD_CALL)) ) {
