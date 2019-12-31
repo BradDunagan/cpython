@@ -6374,7 +6374,8 @@ fast_block_end:
             if (b->b_type == SETUP_LOOP && why == WHY_BREAK) {
                 why = WHY_NOT;
                 JUMPTO(b->b_handler);
-                break;
+            //  break;			bradds		Do not execute the next
+		    	DISPATCH();	//	bradds		stmt before returning
             }
             if (why == WHY_EXCEPTION && (b->b_type == SETUP_EXCEPT
                 || b->b_type == SETUP_FINALLY)) {
