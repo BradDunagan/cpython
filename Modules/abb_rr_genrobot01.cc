@@ -237,6 +237,9 @@ int		CDGenRobot01::ConfigureLink ( PECB * pCB,
 	{
 		pR = Get();
 
+		if ( iJ <= pR->nJoints )		//	2020
+			pR->nJoints = iJ + 1;		//	
+
 		if ( (iJ < 0) || (iJ >= GR01_MAX_JOINTS) )
 		{
 			throw M ( AE_RSP_INVALID_JOINT_INDEX, sW,
@@ -783,7 +786,8 @@ void	CDGenRobot01::GetIKJoints ( SRGenRobot01_vXX * pR, int & iJk0,
 				((pR->JType[iJk0] & jtNoInvKin) == 0) )  break;
 	}
 
-	if ( iJk0 + 7 > pR->nJoints )
+//	if ( iJk0 + 7 > pR->nJoints )					2020
+	if ( iJk0 + pR->nJoints > pR->nJoints )
 	{
 		iJk0 = -1;
 
@@ -1067,7 +1071,8 @@ SRGenRobot01_vXX *	CDGenRobot01::Get()
 		pRD->GripOrgId = 0;		pRD->GripOrgA0.Reset();
 		pRD->GrspEntId = 0;		pRD->GrspEntA0.Reset();
 
-		pRD->nJoints = 7;
+	//	pRD->nJoints = 7;
+		pRD->nJoints = 0;		//	2020	Set in ConfigureLink().
 
 		//	Paul parameters.
 		//
