@@ -36,7 +36,8 @@
 /*-----------------------  CDGenRobot01::TryBoth()  --------------------------*/
 /*
 */
-bool	CDGenRobot01::TryBoth ( CM4 & T, CM4 & G, CM4 A[], CM4 & B, 
+bool	CDGenRobot01::TryBoth ( SRGenRobot01_vXX *	pR,
+								CM4 & T, CM4 & G, CM4 A[], CM4 & B, 
 								BOOL   bRotate[],
 								double JNewR[][2], int Odr[], int Jn,
 			  InvKinFunc IKFnc, double JCurR[],    double MaxDelta,
@@ -78,9 +79,11 @@ bool	CDGenRobot01::TryBoth ( CM4 & T, CM4 & G, CM4 A[], CM4 & B,
 
 		CM4 Lb = B * (J * A[Jn - 1]);
 
-		if ( Jn < 7 )
+	//	if ( Jn < 7 )
+		if ( Jn < pR->nJoints  )		//	2020
 		{
-			if ( TryBoth ( T, G, A, Lb, bRotate,
+			if ( TryBoth ( pR, 
+						   T, G, A, Lb, bRotate,
 										JNewR,  Odr, Jn + 1, IKFnc, JCurR,
 															 MaxDelta, 
 										J_BAF ) )
@@ -161,8 +164,10 @@ bool	CDGenRobot01::TryBoth ( CM4 & T, CM4 & G, CM4 A[], CM4 & B,
 	//	
 	//	Use the other solution.
 	//
-	while ( IKFnc && (Jn < 7) && O_SOLVED(Odr[Jn-1],0) 
-							  && O_SOLVED(Odr[Jn-1],1)  )
+//	while ( IKFnc && (Jn < 7) && O_SOLVED(Odr[Jn-1],0) 			2020
+//							  && O_SOLVED(Odr[Jn-1],1)  )
+	while ( IKFnc && (Jn < pR->nJoints) && O_SOLVED(Odr[Jn-1],0) 
+										&& O_SOLVED(Odr[Jn-1],1)  )
 	{
 		if ( fabs ( JNewR[Jn-1][0] - JNewR[Jn-1][1] ) < 0.000001 )  break;
 
@@ -174,7 +179,8 @@ bool	CDGenRobot01::TryBoth ( CM4 & T, CM4 & G, CM4 A[], CM4 & B,
 		//
 		int	iJ[7], ij, j;		//	Joint indices in the oder they were solved.
 
-		for ( i = 0; i < 7; i++ )
+	//	for ( i = 0; i < 7; i++ )
+		for ( i = 0; i < pR->nJoints; i++ )			//	2020
 		{
 			if ( ! (O_SOLVED(Odr[i],0) || O_SOLVED(Odr[i],1)) )  break;
 
@@ -187,9 +193,12 @@ bool	CDGenRobot01::TryBoth ( CM4 & T, CM4 & G, CM4 A[], CM4 & B,
 
 		iJ[i++] = ij;
 
-		for ( ; i < 7; i++ )	//	Find the indices of the remaining joints.
+	//	for ( ; i < 7; i++ )	//	Find the indices of the remaining joints.
+		//	Find the indices of the remaining joints.
+		for ( ; i < pR->nJoints; i++ )				//	2020
 		{
-			for ( ij = 0; ij < 7; ij++ )
+		//	for ( ij = 0; ij < 7; ij++ )
+			for ( ij = 0; ij < pR->nJoints; ij++ )	//	2020
 			{
 				for ( j = 0; (j < i) && (iJ[j] != ij); j++ );
 
@@ -199,7 +208,8 @@ bool	CDGenRobot01::TryBoth ( CM4 & T, CM4 & G, CM4 A[], CM4 & B,
 
 		double JCurR2[7];    int Odr2[7];		//	Set the lower joints'
 												//	current value to solutions 
-		for ( i = 0; i < 7; i++ )				//	that were found for them.
+	//	for ( i = 0; i < 7; i++ )	2020		
+		for ( i = 0; i < pR->nJoints; i++ )		//	that were found for them.
 		{
 			ij = iJ[i];		_ASSERTE ( ij >= 0 );
 
@@ -224,23 +234,31 @@ bool	CDGenRobot01::TryBoth ( CM4 & T, CM4 & G, CM4 A[], CM4 & B,
 		JNewR[ij][0] = JNewR[ij][1];	//	Set new first to that of second.
 
 
-		for ( i++; i < 7; i++ )		//	Solve the remaining joints.
+	//	for ( i++; i < 7; i++ )		//	Solve the remaining joints.
+		//	Solve the remaining joints.
+		for ( i++; i < pR->nJoints; i++ )		//	2020
 		{
 			ij = iJ[i];
 
 			JCurR2[ij] = JCurR[ij];		Odr2[ij] = 0;
 		}
 
-		Print (  1, sW, "J:  %7.2f %7.2f %7.2f %7.2f %7.2f %7.2f %7.2f",
-						JCurR2[0] * PI2DEG, JCurR2[1] * PI2DEG, 
-						JCurR2[2] * PI2DEG, JCurR2[3] * PI2DEG, 
-						JCurR2[4] * PI2DEG, JCurR2[5] * PI2DEG, 
-						JCurR2[6] * PI2DEG );
+		if ( pR->nJoints == 7 ) 
+			Print (  1, sW, "J:  %7.2f %7.2f %7.2f %7.2f %7.2f %7.2f %7.2f",
+							JCurR2[0] * PI2DEG, JCurR2[1] * PI2DEG, 
+							JCurR2[2] * PI2DEG, JCurR2[3] * PI2DEG, 
+							JCurR2[4] * PI2DEG, JCurR2[5] * PI2DEG, 
+							JCurR2[6] * PI2DEG ); 
+		else 
+			Print (  1, sW, "J:  %7.2f %7.2f %7.2f %7.2f %7.2f %7.2f",
+							JCurR2[0] * PI2DEG, JCurR2[1] * PI2DEG, 
+							JCurR2[2] * PI2DEG, JCurR2[3] * PI2DEG, 
+							JCurR2[4] * PI2DEG, JCurR2[5] * PI2DEG ); 
 
 		IKFnc ( T.GetM(), JCurR2, JNewR, MaxDelta, Odr2 );
 
 
-		PrintJNewR ( sW, JNewR, Odr2 );
+		PrintJNewR ( sW, pR, JNewR, Odr2 );
 
 
 		nRecalls++;
@@ -253,14 +271,18 @@ bool	CDGenRobot01::TryBoth ( CM4 & T, CM4 & G, CM4 A[], CM4 & B,
 		//
 		//	It may be that a later joint will now have multiple solutions.
 		//
-		for ( i = 0; i < 7; i++ )		//	Get a solution on all joints?
+	//	for ( i = 0; i < 7; i++ )		//	Get a solution on all joints?
+		//	Get a solution on all joints?
+		for ( i = 0; i < pR->nJoints; i++ )			//	2020
 		{
 			if ( ! (O_SOLVED(Odr2[i],0) || O_SOLVED(Odr2[i],1)) )  break;
 		}
 
-		if ( i == 7 )
+	//	if ( i == 7 )
+		if ( i == pR->nJoints )			//	2020
 		{
-			if ( TryBoth ( T, G, A, Lb, bRotate, JNewR, Odr2, 1, IKFnc, 
+			if ( TryBoth ( pR,
+						   T, G, A, Lb, bRotate, JNewR, Odr2, 1, IKFnc, 
 																 JCurR2, 
 																 MaxDelta, 
 																 J_BAF ) )  
@@ -293,8 +315,10 @@ bool	CDGenRobot01::TryBoth ( CM4 & T, CM4 & G, CM4 A[], CM4 & B,
 	//	the arm may need to run some extra routine in order to avoid collisions
 	//	while the large move is done.
 	//
-	while ( IKFnc && (Jn < 7) && ! (   O_SOLVED(Odr[Jn-1],0) 
-									|| O_SOLVED(Odr[Jn-1],1)) )
+//	while ( IKFnc && (Jn < 7) && ! (   O_SOLVED(Odr[Jn-1],0) 
+//									|| O_SOLVED(Odr[Jn-1],1)) )
+	while ( IKFnc && (Jn < pR->nJoints) && ! (   O_SOLVED(Odr[Jn-1],0) 
+											  || O_SOLVED(Odr[Jn-1],1)) )
 	{
 		if ( bTryingSingularity )  break;
 
@@ -310,7 +334,8 @@ bool	CDGenRobot01::TryBoth ( CM4 & T, CM4 & G, CM4 A[], CM4 & B,
 		//
 		int	iJ[7], ij, j;		//	Joint indices in the oder they were solved.
 
-		for ( i = j = 0; i < 7; i++ )
+	//	for ( i = j = 0; i < 7; i++ )
+		for ( i = j = 0; i < pR->nJoints; i++ )
 		{
 		//	if ( ! (   O_SOLVED(Odr[Jn-1],0) 
 		//			|| O_SOLVED(Odr[Jn-1],1)) )  continue;
@@ -322,9 +347,12 @@ bool	CDGenRobot01::TryBoth ( CM4 & T, CM4 & G, CM4 A[], CM4 & B,
 
 		int nJS = j;			//	Number of solved joints.
 
-		for ( ; j < 7; j++ )	//	Find the indices of the remaining joints.
+	//	for ( ; j < 7; j++ )	//	Find the indices of the remaining joints.
+		//	Find the indices of the remaining joints.
+		for ( ; j < pR->nJoints; j++ )
 		{
-			for ( ij = 0; ij < 7; ij++ )
+		//	for ( ij = 0; ij < 7; ij++ )
+			for ( ij = 0; ij < pR->nJoints; ij++ )
 			{
 				for ( i = 0; (i < j) && (iJ[i] != ij); i++ );
 
@@ -347,7 +375,8 @@ bool	CDGenRobot01::TryBoth ( CM4 & T, CM4 & G, CM4 A[], CM4 & B,
 		//	Attempt to solve the remaining joints again with no limit 
 		//	(2 * PI) on the joint change.
 		//
-		for ( ; i < 7; i++ )
+	//	for ( ; i < 7; i++ )
+		for ( ; i < pR->nJoints; i++ )
 		{
 			ij = iJ[i];
 
@@ -358,7 +387,8 @@ bool	CDGenRobot01::TryBoth ( CM4 & T, CM4 & G, CM4 A[], CM4 & B,
 
 		CM4	Lb;		bool bR;
 
-		bR = TryBoth ( T, G, A, Lb, bRotate,
+		bR = TryBoth ( pR,
+					   T, G, A, Lb, bRotate,
 									JNewR, 
 			//	2011-Oct-02			Odr2, 1, IKFnc, JCurR,  2 * PI, J_BAF );
 									Odr2, 1, IKFnc, JCurR2, 2 * PI, J_BAF );
@@ -398,6 +428,7 @@ bool	CDGenRobot01::TryBoth ( CM4 & T, CM4 & G, CM4 A[], CM4 & B,
 /*
 */
 void	CDGenRobot01::PrintJNewR ( const char *	sW, 
+										 SRGenRobot01_vXX *	pR,
 										 double JNewR[][2], 
 										 int	Odr[] )
 {
@@ -405,7 +436,8 @@ void	CDGenRobot01::PrintJNewR ( const char *	sW,
 
 	iB = sprintf ( sBuf, "N:  " );
 
-	for ( iJ = 0; iJ < 7; iJ++ )
+//	for ( iJ = 0; iJ < 7; iJ++ )
+	for ( iJ = 0; iJ < pR->nJoints; iJ++ )
 	{
 		if ( O_SOLVED(Odr[iJ],0) )  
 			iB += sprintf ( &sBuf[iB], "%7.2f ", JNewR[iJ][0] * PI2DEG );
@@ -417,7 +449,8 @@ void	CDGenRobot01::PrintJNewR ( const char *	sW,
 
 	iB = sprintf ( sBuf, "N:  " );
 
-	for ( iJ = 0; iJ < 7; iJ++ )
+//	for ( iJ = 0; iJ < 7; iJ++ )
+	for ( iJ = 0; iJ < pR->nJoints; iJ++ )
 	{
 		if ( O_SOLVED(Odr[iJ],1) )  
 			iB += sprintf ( &sBuf[iB], "%7.2f ", JNewR[iJ][1] * PI2DEG );
@@ -477,11 +510,17 @@ void	CDGenRobot01::PrintJandGb ( const char *	sW,
 
 	Gb = Gb * G;
 
-	Print ( 1, sW, "%s   J: %7.2f %7.2f %7.2f %7.2f %7.2f %7.2f %7.2f",
-					Desc,
-					JCur[0] * PI2DEG, JCur[1] * PI2DEG, JCur[2] * PI2DEG, 
-					JCur[3] * PI2DEG, JCur[4] * PI2DEG, JCur[5] * PI2DEG, 
-					JCur[6] * PI2DEG );
+	if ( pR->nJoints == 7 ) 
+		Print ( 1, sW, "%s   J: %7.2f %7.2f %7.2f %7.2f %7.2f %7.2f %7.2f",
+						Desc,
+						JCur[0] * PI2DEG, JCur[1] * PI2DEG, JCur[2] * PI2DEG, 
+						JCur[3] * PI2DEG, JCur[4] * PI2DEG, JCur[5] * PI2DEG, 
+						JCur[6] * PI2DEG ); 
+	else 
+		Print ( 1, sW, "%s   J: %7.2f %7.2f %7.2f %7.2f %7.2f %7.2f",
+						Desc,
+						JCur[0] * PI2DEG, JCur[1] * PI2DEG, JCur[2] * PI2DEG, 
+						JCur[3] * PI2DEG, JCur[4] * PI2DEG, JCur[5] * PI2DEG ); 
 
 	Print ( 1, sW, "%s XYZ: %7.2f %7.2f %7.2f", Desc,
 												Gb.GetX(), Gb.GetY(), Gb.GetZ() );
@@ -597,24 +636,33 @@ int		CDGenRobot01::KPaul03_RPPaul (		 PECB *				pCB,
 									   TAz * PI2DEG );
 	}
 
-	Print (  3, sW, "J:  %7.2f %7.2f %7.2f %7.2f %7.2f %7.2f %7.2f",
-					JCur[0] * PI2DEG, JCur[1] * PI2DEG, JCur[2] * PI2DEG, 
-					JCur[3] * PI2DEG, JCur[4] * PI2DEG, JCur[5] * PI2DEG, 
-					JCur[6] * PI2DEG );
+	if ( pR->nJoints == 7 )
+		Print (  3, sW, "J:  %7.2f %7.2f %7.2f %7.2f %7.2f %7.2f %7.2f",
+						JCur[0] * PI2DEG, JCur[1] * PI2DEG, JCur[2] * PI2DEG, 
+						JCur[3] * PI2DEG, JCur[4] * PI2DEG, JCur[5] * PI2DEG, 
+						JCur[6] * PI2DEG );
+	else
+		Print (  3, sW, "J:  %7.2f %7.2f %7.2f %7.2f %7.2f %7.2f",
+						JCur[0] * PI2DEG, JCur[1] * PI2DEG, JCur[2] * PI2DEG, 
+						JCur[3] * PI2DEG, JCur[4] * PI2DEG, JCur[5] * PI2DEG ); 
 
 	CM4 T ( Trg );
 
 
-	double MaxD = PI / 2;		//	Max allowed change in joint.  For now.
+	//	Max allowed change in joint.  For now.
+//	double MaxD = PI / 2;
+	double MaxD = 12.0 * PI / 180.0;
 
 	double JCurR [7], JNewR [7][2];		int OdrBak [GR01_MAX_JOINTS];
 
-	for ( iJ = 0; iJ < 7; iJ++ )  JCurR[iJ] = JCur[iJ];
+//	for ( iJ = 0; iJ < 7; iJ++ )  JCurR[iJ] = JCur[iJ];
+	for ( iJ = 0; iJ < pR->nJoints; iJ++ )  JCurR[iJ] = JCur[iJ];
 
 	memcpy ( OdrBak, Odr, sizeof(OdrBak) );
 
 
-	for ( iJ = 0; iJ < 7; iJ++ )		//	2011-Apr-08
+//	for ( iJ = 0; iJ < 7; iJ++ )		//	2011-Apr-08
+	for ( iJ = 0; iJ < pR->nJoints; iJ++ )		//	2011-Apr-08
 	{
 		MvSln & S = pPath->pS[pPath->nS];
 
@@ -636,12 +684,13 @@ int		CDGenRobot01::KPaul03_RPPaul (		 PECB *				pCB,
 	IKFunc ( T.GetM(), JCurR, JNewR, MaxD, Odr );
 
 
-	PrintJNewR ( sW, JNewR, Odr );
+	PrintJNewR ( sW, pR, JNewR, Odr );
 
 
 	CM4	Lb;		CM4 A[7];	BOOL bRotate[7];	double J_BAF [7];
 
-	for ( iJ = 0; iJ < 7; iJ++ )
+//	for ( iJ = 0; iJ < 7; iJ++ )
+	for ( iJ = 0; iJ < pR->nJoints; iJ++ )
 	{
 	//	bRotate[iJ] =	 (((int)pR->JType[iJ] & (int)jtRotating) != 0)
 	//				  && (((int)pR->JType[iJ] & (int)jtNoInvKin) == 0);
@@ -663,7 +712,8 @@ int		CDGenRobot01::KPaul03_RPPaul (		 PECB *				pCB,
 		PrintXYZ ( sW, "Gb", T * G );
 	}
 
-	if ( ! TryBoth ( T, G, A, Lb, bRotate, 
+	if ( ! TryBoth ( pR,
+					 T, G, A, Lb, bRotate, 
 								  JNewR, Odr, 1, IKFunc, JCurR, MaxD, J_BAF ) )
 	{
 		memcpy ( Odr, OdrBak, sizeof(OdrBak) );
@@ -724,10 +774,15 @@ int		CDGenRobot01::KPaul03_RPPaul (		 PECB *				pCB,
 		return 0;
 	}
 
-	Print (  3, sW, "N:  %7.2f %7.2f %7.2f %7.2f %7.2f %7.2f %7.2f",
-					JNew[0] * PI2DEG, JNew[1] * PI2DEG, JNew[2] * PI2DEG, 
-					JNew[3] * PI2DEG, JNew[4] * PI2DEG, JNew[5] * PI2DEG, 
-					JNew[6] * PI2DEG );
+	if ( pR->nJoints == 7 )
+		Print (  3, sW, "N:  %7.2f %7.2f %7.2f %7.2f %7.2f %7.2f %7.2f",
+						JNew[0] * PI2DEG, JNew[1] * PI2DEG, JNew[2] * PI2DEG, 
+						JNew[3] * PI2DEG, JNew[4] * PI2DEG, JNew[5] * PI2DEG, 
+						JNew[6] * PI2DEG );
+	else
+		Print (  3, sW, "N:  %7.2f %7.2f %7.2f %7.2f %7.2f %7.2f",
+						JNew[0] * PI2DEG, JNew[1] * PI2DEG, JNew[2] * PI2DEG, 
+						JNew[3] * PI2DEG, JNew[4] * PI2DEG, JNew[5] * PI2DEG );
 
 
 	//	2011-May-02		Joint limit violation?

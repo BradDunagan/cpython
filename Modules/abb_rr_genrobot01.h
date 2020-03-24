@@ -372,7 +372,8 @@ virtual ~CDGenRobot01();
 
 		//	In	KinematicsPaul03.cpp
 		//
-		bool	TryBoth ( CM4 & T, CM4 & G, CM4 A[], CM4 & B, 
+		bool	TryBoth ( SRGenRobot01_vXX *	pR,
+						  CM4 & T, CM4 & G, CM4 A[], CM4 & B, 
 						  BOOL   bRotate[],
 						  double JNewR[][2], int  Odr[], int Jn,
 						  InvKinFunc IKFnc,		 double JCurR[], double MaxDelta,
@@ -380,6 +381,7 @@ virtual ~CDGenRobot01();
 
 
 		void	PrintJNewR ( const char	*	sW, 
+								   SRGenRobot01_vXX *	pR,
 								   double	JNewR[][2], 
 								   int		Odr[] );
 
