@@ -578,7 +578,7 @@ PORT int Test_InvKin ( const double Tgt[], double JCur[], double JNew[] )
 
             //  Intermediate terms.
             //
-            double  y = ((S3 * ((C2 * ((C1 * ox) + (S1 * oy))) + (S2 * oz))) + (-C3 * ((-S2 * ((C1 * ox) + (S1 * oy))) + (C2 * oz))));
+            double  y = -((S3 * ((C2 * ((C1 * ox) + (S1 * oy))) + (S2 * oz))) + (-C3 * ((-S2 * ((C1 * ox) + (S1 * oy))) + (C2 * oz))));
             double  x = ((S3 * ((C2 * ((C1 * nx) + (S1 * ny))) + (S2 * nz))) + (-C3 * ((-S2 * ((C1 * nx) + (S1 * ny))) + (C2 * nz))));
 
             //  Requirements
@@ -1698,7 +1698,7 @@ PORT int InvKin ( const double Tgt[], double JCur[],
 
             //  Intermediate terms.
             //
-            double  y = ((S3 * ((C2 * ((C1 * ox) + (S1 * oy))) + (S2 * oz))) + (-C3 * ((-S2 * ((C1 * ox) + (S1 * oy))) + (C2 * oz))));
+            double  y = -((S3 * ((C2 * ((C1 * ox) + (S1 * oy))) + (S2 * oz))) + (-C3 * ((-S2 * ((C1 * ox) + (S1 * oy))) + (C2 * oz))));
             double  x = ((S3 * ((C2 * ((C1 * nx) + (S1 * ny))) + (S2 * nz))) + (-C3 * ((-S2 * ((C1 * nx) + (S1 * ny))) + (C2 * nz))));
 
             //  Requirements

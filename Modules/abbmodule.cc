@@ -44,7 +44,7 @@ static int	CBFnc ( PECB * pCB )
 	if ( (! abbCallback) || (! abbCallback->callback) ) {
 		return -1; }
 
-	printf ( "CBFnc()\n" );
+//	printf ( "CBFnc()\n" );
 	
 	if ( pCB->Cmd == PECB_SYNC_VPS3 ) {
 

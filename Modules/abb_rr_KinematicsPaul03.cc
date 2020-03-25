@@ -104,8 +104,56 @@ bool	CDGenRobot01::TryBoth ( SRGenRobot01_vXX *	pR,
 	//	//
 	//	//	2011-Oct-01		Check grasp-coords as target.
 		//
+	//	double Px, Py, Pz, Ax, Ay, Az;
+	//
+	//	G.GetXYZRPY_TPR ( Px, Py, Pz, Ax, Ay, Az );
+	//	if ( fabs ( fabs ( Ax ) - PI ) < 0.00000001 )  Ax = PI;
+	//	if ( fabs ( fabs ( Ay ) - PI ) < 0.00000001 )  Ay = PI;
+	//	if ( fabs ( fabs ( Az ) - PI ) < 0.00000001 )  Az = PI;
+	//	Print (  3, sW, "G:  %7.2f %7.2f %7.2f  %7.2f %7.2f %7.2f",
+	//					Px, Py, Pz, Ax * PI2DEG,
+	//								   Ay * PI2DEG,
+	//								   Az * PI2DEG );
+
+	//	Lb.GetXYZRPY_TPR ( Px, Py, Pz, Ax, Ay, Az );
+	//	if ( fabs ( fabs ( Ax ) - PI ) < 0.00000001 )  Ax = PI;
+	//	if ( fabs ( fabs ( Ay ) - PI ) < 0.00000001 )  Ay = PI;
+	//	if ( fabs ( fabs ( Az ) - PI ) < 0.00000001 )  Az = PI;
+	//	Print (  3, sW, "Lb: %7.2f %7.2f %7.2f  %7.2f %7.2f %7.2f",
+	//					Px, Py, Pz, Ax * PI2DEG,
+	//								   Ay * PI2DEG,
+	//								   Az * PI2DEG );
+
+	//	T.GetXYZRPY_TPR ( Px, Py, Pz, Ax, Ay, Az );
+	//	if ( fabs ( fabs ( Ax ) - PI ) < 0.00000001 )  Ax = PI;
+	//	if ( fabs ( fabs ( Ay ) - PI ) < 0.00000001 )  Ay = PI;
+	//	if ( fabs ( fabs ( Az ) - PI ) < 0.00000001 )  Az = PI;
+	//	Print (  3, sW, "T:  %7.2f %7.2f %7.2f  %7.2f %7.2f %7.2f",
+	//					Px, Py, Pz, Ax * PI2DEG,
+	//								   Ay * PI2DEG,
+	//								   Az * PI2DEG );
+
 		CM4 Gb = Lb * G;
 		CM4 Tb = T  * G;
+		
+	//	Gb.GetXYZRPY_TPR ( Px, Py, Pz, Ax, Ay, Az );
+	//	if ( fabs ( fabs ( Ax ) - PI ) < 0.00000001 )  Ax = PI;
+	//	if ( fabs ( fabs ( Ay ) - PI ) < 0.00000001 )  Ay = PI;
+	//	if ( fabs ( fabs ( Az ) - PI ) < 0.00000001 )  Az = PI;
+	//	Print (  3, sW, "Gb: %7.2f %7.2f %7.2f  %7.2f %7.2f %7.2f",
+	//					Px, Py, Pz, Ax * PI2DEG,
+	//								   Ay * PI2DEG,
+	//								   Az * PI2DEG );
+
+	//	Tb.GetXYZRPY_TPR ( Px, Py, Pz, Ax, Ay, Az );
+	//	if ( fabs ( fabs ( Ax ) - PI ) < 0.00000001 )  Ax = PI;
+	//	if ( fabs ( fabs ( Ay ) - PI ) < 0.00000001 )  Ay = PI;
+	//	if ( fabs ( fabs ( Az ) - PI ) < 0.00000001 )  Az = PI;
+	//	Print (  3, sW, "Tb: %7.2f %7.2f %7.2f  %7.2f %7.2f %7.2f",
+	//					Px, Py, Pz, Ax * PI2DEG,
+	//								   Ay * PI2DEG,
+	//								   Az * PI2DEG );
+
 		PrintXYZ ( sW, "Gb", Gb );
 		PrintXYZ ( sW, "Tb", Tb );
 		CM4 R = ~Gb * Tb;	double DPx, DPy, DPz, DAx, DAy, DAz;
