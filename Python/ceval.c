@@ -3516,16 +3516,20 @@ exit_eval_frame:
 #undef FAST_DISPATCH
 }
 
+static _BradDs_DictCB	BDDictCB = 0;
+
 int		_BradDs_PyEval_EvalFrameDefault_Init ( PyFrameObject * f,
 											   int * instr_lb,
 											   int * instr_ub,
-											   int * instr_prev ) 
+											   int * instr_prev,
+	   										   _BradDs_DictCB cb ) 
 {
 	*instr_ub = -1;	 *instr_lb = 0;	*instr_prev = -1;
 //	int lasti = f->f_lasti;
 //	f->f_lasti =  0;
 	int rtn = bradds_maybe_ ( f, 0, instr_lb, instr_ub, instr_prev );
 //	f->f_lasti = lasti;
+	BDDictCB = cb;
 	return rtn;
 }	//	_BradDs_PyEval_EvalFrameDefault_Init()
 
@@ -4843,8 +4847,12 @@ main_loop:
                 Py_DECREF(v);
                 goto error;
             }
-            if (PyDict_CheckExact(ns))
-                err = PyDict_SetItem(ns, name, v);
+		//	if (PyDict_CheckExact(ns))					bradds
+		//		err = PyDict_SetItem(ns, name, v);
+			if ( PyDict_CheckExact ( ns ) ) {
+				err = PyDict_SetItem(ns, name, v);
+				if ( (! err) && BDDictCB) {
+				   	err = BDDictCB ( STORE_NAME, ns, name, &v ); } }
             else
                 err = PyObject_SetItem(ns, name, v);
             Py_DECREF(v);
@@ -5006,6 +5014,18 @@ main_loop:
             if (PyDict_CheckExact(locals)) {
                 v = PyDict_GetItem(locals, name);
                 Py_XINCREF(v);
+				if ( (v != NULL) && BDDictCB) {		//	bradds
+				   	if ( BDDictCB ( LOAD_NAME, locals, name, &v ) ) {
+						PyErr_Format(PyExc_SystemError,
+									 "failed dict cb when loading %R", name);
+						goto error; } 
+					//	Need to callback to the app to get the record?
+					if ( f->bradds_f_flags & BRADDS_F_FLAGS_PE_CALL ) {
+						stack_pointer = bradds_start_stack_pointer;
+						Py_DECREF(v);
+						retval = Py_None;
+						Py_INCREF(retval);
+						NO_STACK_RETURN(); } }
             }
             else {
                 v = PyObject_GetItem(locals, name);
