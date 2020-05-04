@@ -4984,6 +4984,8 @@ main_loop:
             PyObject *v = POP();
             int err;
             err = PyDict_SetItem(f->f_globals, name, v);
+			if ( (! err) && BDDictCB) {				//	bradds
+			   	err = BDDictCB ( STORE_GLOBAL, f->f_globals, name, &v ); } 
             Py_DECREF(v);
             if (err != 0)
                 goto error;
