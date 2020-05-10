@@ -4224,6 +4224,19 @@ main_loop:
             PyObject *res = PyObject_GetItem(container, sub);
             Py_DECREF(container);
             Py_DECREF(sub);
+
+			if ( (res != NULL) && BDDictCB) {		//	bradds
+				if ( BDDictCB ( BINARY_SUBSCR, container, sub, &res ) ) {
+					PyErr_Format(PyExc_SystemError,
+								 "failed dict cb when loading %R", sub);
+					goto error; } 
+				//	Need to callback to the app to get the record?
+				if ( f->bradds_f_flags & BRADDS_F_FLAGS_PE_CALL ) {
+					stack_pointer = bradds_start_stack_pointer;
+					retval = Py_None;
+					Py_INCREF(retval);
+					NO_STACK_RETURN(); } }
+
             SET_TOP(res);
             if (res == NULL)
                 goto error;
