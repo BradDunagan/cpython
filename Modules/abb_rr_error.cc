@@ -25,7 +25,7 @@
 #include    "abb_rr_diags.h"
 
 
-#define	F(f)	"("__FILE__")" "  " f
+#define	F(f)	"(" __FILE__ ")" "  " f
 
 
 //	Errors "pool".
