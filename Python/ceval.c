@@ -3516,6 +3516,44 @@ exit_eval_frame:
 #undef FAST_DISPATCH
 }
 
+static
+PyFrameObject *	BradDs_Do_Return ( PyThreadState * tstate, PyFrameObject * f )
+{
+	PyFrameObject * fb = f->f_back;
+
+	/*	What function_code_fastcall() does after otherwise returning from 
+		_EvalFrame (or whatever). 
+	*/
+	if (Py_REFCNT(f) > 1) {
+		Py_DECREF(f);
+		_PyObject_GC_TRACK(f);
+	}
+	else {
+		++tstate->recursion_depth;
+		Py_DECREF(f);
+		--tstate->recursion_depth;
+	}
+
+	/*	Something like what call_function() does.
+
+		Clear the stack of the function object.
+	*/
+	PyObject **pp_stack = fb->f_stacktop;
+	int oparg = fb->bradds_f_oparg;
+	PyObject **pfunc = (pp_stack) - oparg - 1;
+
+	while ((pp_stack) > pfunc) {
+		PyObject * w = EXT_POP(pp_stack);
+		//	LOAD_METHOD may set entry at the top of the stack NULL.
+		if ( w != NULL ) {
+			Py_DECREF(w); }
+	}
+	 fb->f_stacktop  = pp_stack;
+
+	return fb;
+
+}	//	BradDs_Do_Return()
+
 static _BradDs_DictCB	BDDictCB = 0;
 
 int		_BradDs_PyEval_EvalFrameDefault_Init ( PyFrameObject * f,
@@ -3551,6 +3589,7 @@ _BradDs_PyEval_EvalFrameDefault ( PyFrameObject *f, int throwflag,
 
 	int bradds_returning = 0;
 	int bradds_was_native_call = 0;
+	int bradds_raise = 0;
 
     /* when tracing we set things up so that
 
@@ -3617,8 +3656,8 @@ _BradDs_PyEval_EvalFrameDefault ( PyFrameObject *f, int throwflag,
 		retval = Py_None;											\
 		Py_INCREF(retval);											\
 		NO_STACK_RETURN();											\
-	} else															\
-		continue 
+	} else {														\
+		continue; }
 #define FAST_DISPATCH()		DISPATCH()
 #endif
 
@@ -4553,6 +4592,9 @@ main_loop:
                     why = WHY_EXCEPTION;
                     goto fast_block_end;
                 }
+				bradds_returning = 1;
+				bradds_raise = 1;
+				f->bradds_f_flags |= BRADDS_F_FLAGS_RAISE;
                 break;
             default:
                 PyErr_SetString(PyExc_SystemError,
@@ -6383,6 +6425,52 @@ error:
             call_exc_trace(tstate->c_tracefunc, tstate->c_traceobj,
                            tstate, f);
 
+		if ( bradds_raise ) {		//	bradds
+			/*	First, need to do a function return? How do we know?
+				->	bradds_raise indicates a raise.  So, we expect a 
+					try block. If a block is not in this frame then
+					do a return.
+			*/
+		//	while ( f->f_back && (f->f_iblock <= 0) ) {
+		//		f = BradDs_Do_Return ( tstate, f ); }
+		//	stack_pointer = f->f_stacktop;
+    	//	co = f->f_code;
+		//	names = co->co_names;
+		//	consts = co->co_consts;
+		//	fastlocals = f->f_localsplus;
+		//	freevars = f->f_localsplus + co->co_nlocals;
+		//	first_instr = (_Py_CODEUNIT *) PyBytes_AS_STRING(co->co_code);
+
+
+			/*	Then, need to unwind and jump to the handler before returning
+				to the app.
+
+				How to tell the app what frame we are in now?
+			*/
+
+			/*	For now, just full through ... */
+
+			//	Try this ...
+			if ( f->f_back && (f->f_iblock <= 0) ) {
+				f->bradds_f_flags |= BRADDS_F_FLAGS_RETURN;
+				f = BradDs_Do_Return ( tstate, f ); 
+
+				tstate->frame = f;
+				*f->f_stacktop++ = retval;
+
+				stack_pointer = f->f_stacktop;
+				co = f->f_code;
+				names = co->co_names;
+				consts = co->co_consts;
+				fastlocals = f->f_localsplus;
+				freevars = f->f_localsplus + co->co_nlocals;
+				first_instr = (_Py_CODEUNIT *) PyBytes_AS_STRING(co->co_code);
+
+			//	return _Py_CheckFunctionResult(NULL, retval, "PyEval_EvalFrameEx");
+			}
+		}
+
+
 fast_block_end:
         assert(why != WHY_NOT);
 
@@ -6405,7 +6493,12 @@ fast_block_end:
                 UNWIND_EXCEPT_HANDLER(b);
                 continue;
             }
-            UNWIND_BLOCK(b);
+		//	UNWIND_BLOCK(b);
+			while (((int)(stack_pointer - f->f_valuestack)) > (b)->b_level) { 
+				PyObject *v = (*--stack_pointer);
+				Py_XDECREF(v); 
+			}
+
             if (b->b_type == SETUP_LOOP && why == WHY_BREAK) {
                 why = WHY_NOT;
                 JUMPTO(b->b_handler);
@@ -6452,7 +6545,12 @@ fast_block_end:
                 PUSH(exc);
                 why = WHY_NOT;
                 JUMPTO(handler);
-                break;
+			//	break;				bradds
+			//	FAST_DISPATCH();	//	return to the app.
+				f->f_stacktop = stack_pointer;
+				f->bradds_f_next_instr = next_instr;
+			//	return _Py_CheckFunctionResult(NULL, retval, "PyEval_EvalFrameEx");
+				return retval;
             }
             if (b->b_type == SETUP_FINALLY) {
                 if (why & (WHY_RETURN | WHY_CONTINUE))
@@ -6527,45 +6625,13 @@ exit_eval_frame:
 
 	if ( bradds_returning && (! bradds_was_native_call) && f->f_back ) {
 
-		PyFrameObject * fb = f->f_back;
-
-		/*	What function_code_fastcall() does after otherwise returning from 
-			_EvalFrame (or whatever). 
-		*/
-		if (Py_REFCNT(f) > 1) {
-			Py_DECREF(f);
-			_PyObject_GC_TRACK(f);
-		}
-		else {
-			++tstate->recursion_depth;
-			Py_DECREF(f);
-			--tstate->recursion_depth;
-		}
-
-		/*	Something like what call_function() does.
-
-			Clear the stack of the function object.
-		*/
-		PyObject **pp_stack = fb->f_stacktop;
-		oparg = fb->bradds_f_oparg;
-	    PyObject **pfunc = (pp_stack) - oparg - 1;
-
-		while ((pp_stack) > pfunc) {
-			PyObject * w = EXT_POP(pp_stack);
-			//	LOAD_METHOD may set entry at the top of the stack NULL.
-			if ( w != NULL ) {
-				Py_DECREF(w); }
-		}
+		PyFrameObject * fb = BradDs_Do_Return ( tstate, f ); 
 
 		/*	As a first approximation, I think thats it.
 		*/
 		tstate->frame = fb;
 		//	retval needs to be pushed on the calling frame's value stack.
-	//	 fb->bradds_f_stack_pointer   = pp_stack;
-	//	*fb->bradds_f_stack_pointer++ = retval;
-	//	assert(((int)(fb->bradds_f_stack_pointer - fb->f_valuestack)) <= fb->f_code->co_stacksize);
 		//	Use fb->f_stacktop? Actually, this might be generally necessary.
-		 fb->f_stacktop   = pp_stack;
 		*fb->f_stacktop++ = retval;
 		assert(((int)(fb->f_stacktop - fb->f_valuestack)) <= fb->f_code->co_stacksize);
 
