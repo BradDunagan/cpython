@@ -139,6 +139,10 @@ PyAPI_FUNC(PyObject *) PyEval_EvalFrameEx(struct _frame *f, int exc);
 #ifndef Py_LIMITED_API
 PyAPI_FUNC(PyObject *) _PyEval_EvalFrameDefault(struct _frame *f, int exc);
 
+
+PyAPI_FUNC(struct _frame *)	_BradDs_Do_Return ( PyThreadState * tstate, 
+												struct _frame * f );
+
 typedef int	(* _BradDs_DictCB) ( int opCode, PyObject *container, 
 											 PyObject *key, PyObject **value );
 

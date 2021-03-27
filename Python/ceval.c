@@ -3516,8 +3516,7 @@ exit_eval_frame:
 #undef FAST_DISPATCH
 }
 
-static
-PyFrameObject *	BradDs_Do_Return ( PyThreadState * tstate, PyFrameObject * f )
+PyFrameObject *	_BradDs_Do_Return ( PyThreadState * tstate, PyFrameObject * f )
 {
 	PyFrameObject * fb = f->f_back;
 
@@ -3552,7 +3551,7 @@ PyFrameObject *	BradDs_Do_Return ( PyThreadState * tstate, PyFrameObject * f )
 
 	return fb;
 
-}	//	BradDs_Do_Return()
+}	//	_BradDs_Do_Return()
 
 static _BradDs_DictCB	BDDictCB = 0;
 
@@ -3877,6 +3876,12 @@ _BradDs_PyEval_EvalFrameDefault ( PyFrameObject *f, int throwflag,
 
     if (throwflag) /* support for generator.throw() */
         goto error;
+
+	/*	bradds	Exception raised?
+	*/
+	if ( PyErr_Occurred() ) {
+		bradds_raise = 1;
+		goto error; }
 
     assert(!PyErr_Occurred());
 
@@ -4594,7 +4599,6 @@ main_loop:
                 }
 				bradds_returning = 1;
 				bradds_raise = 1;
-				f->bradds_f_flags |= BRADDS_F_FLAGS_RAISE;
                 break;
             default:
                 PyErr_SetString(PyExc_SystemError,
@@ -6425,50 +6429,50 @@ error:
             call_exc_trace(tstate->c_tracefunc, tstate->c_traceobj,
                            tstate, f);
 
-		if ( bradds_raise ) {		//	bradds
-			/*	First, need to do a function return? How do we know?
-				->	bradds_raise indicates a raise.  So, we expect a 
-					try block. If a block is not in this frame then
-					do a return.
-			*/
-		//	while ( f->f_back && (f->f_iblock <= 0) ) {
-		//		f = BradDs_Do_Return ( tstate, f ); }
-		//	stack_pointer = f->f_stacktop;
-    	//	co = f->f_code;
-		//	names = co->co_names;
-		//	consts = co->co_consts;
-		//	fastlocals = f->f_localsplus;
-		//	freevars = f->f_localsplus + co->co_nlocals;
-		//	first_instr = (_Py_CODEUNIT *) PyBytes_AS_STRING(co->co_code);
+	//	if ( bradds_raise ) {		//	bradds
+	//		/*	First, need to do a function return? How do we know?
+	//			->	bradds_raise indicates a raise.  So, we expect a 
+	//				try block. If a block is not in this frame then
+	//				do a return.
+	//		*/
+	//	//	while ( f->f_back && (f->f_iblock <= 0) ) {
+	//	//		f = _BradDs_Do_Return ( tstate, f ); }
+	//	//	stack_pointer = f->f_stacktop;
+    //	//	co = f->f_code;
+	//	//	names = co->co_names;
+	//	//	consts = co->co_consts;
+	//	//	fastlocals = f->f_localsplus;
+	//	//	freevars = f->f_localsplus + co->co_nlocals;
+	//	//	first_instr = (_Py_CODEUNIT *) PyBytes_AS_STRING(co->co_code);
 
 
-			/*	Then, need to unwind and jump to the handler before returning
-				to the app.
+	//		/*	Then, need to unwind and jump to the handler before returning
+	//			to the app.
 
-				How to tell the app what frame we are in now?
-			*/
+	//			How to tell the app what frame we are in now?
+	//		*/
 
-			/*	For now, just full through ... */
+	//		/*	For now, just full through ... */
 
-			//	Try this ...
-			if ( f->f_back && (f->f_iblock <= 0) ) {
-				f->bradds_f_flags |= BRADDS_F_FLAGS_RETURN;
-				f = BradDs_Do_Return ( tstate, f ); 
+	//		//	Try this ...
+	//		if ( f->f_back && (f->f_iblock <= 0) ) {
+	//			f->bradds_f_flags |= BRADDS_F_FLAGS_RETURN;
+	//			f = _BradDs_Do_Return ( tstate, f ); 
 
-				tstate->frame = f;
-				*f->f_stacktop++ = retval;
+	//			tstate->frame = f;
+	//			*f->f_stacktop++ = retval;
 
-				stack_pointer = f->f_stacktop;
-				co = f->f_code;
-				names = co->co_names;
-				consts = co->co_consts;
-				fastlocals = f->f_localsplus;
-				freevars = f->f_localsplus + co->co_nlocals;
-				first_instr = (_Py_CODEUNIT *) PyBytes_AS_STRING(co->co_code);
+	//			stack_pointer = f->f_stacktop;
+	//			co = f->f_code;
+	//			names = co->co_names;
+	//			consts = co->co_consts;
+	//			fastlocals = f->f_localsplus;
+	//			freevars = f->f_localsplus + co->co_nlocals;
+	//			first_instr = (_Py_CODEUNIT *) PyBytes_AS_STRING(co->co_code);
 
-			//	return _Py_CheckFunctionResult(NULL, retval, "PyEval_EvalFrameEx");
-			}
-		}
+	//		//	return _Py_CheckFunctionResult(NULL, retval, "PyEval_EvalFrameEx");
+	//		}
+	//	}
 
 
 fast_block_end:
@@ -6550,6 +6554,7 @@ fast_block_end:
 				f->f_stacktop = stack_pointer;
 				f->bradds_f_next_instr = next_instr;
 			//	return _Py_CheckFunctionResult(NULL, retval, "PyEval_EvalFrameEx");
+				f->bradds_f_flags |= BRADDS_F_FLAGS_RAISE;
 				return retval;
             }
             if (b->b_type == SETUP_FINALLY) {
@@ -6623,9 +6628,14 @@ exit_eval_frame:
     Py_LeaveRecursiveCall();
     f->f_executing = 0;
 
-	if ( bradds_returning && (! bradds_was_native_call) && f->f_back ) {
+//	if ( bradds_returning && (! bradds_was_native_call) && f->f_back ) {
+	if ( bradds_raise ) {
+		f->bradds_f_flags |= BRADDS_F_FLAGS_RAISE; }
+	if ( 	( 	(bradds_returning && ! bradds_was_native_call)
+			 ||  bradds_raise)
+		 && f->f_back ) {
 
-		PyFrameObject * fb = BradDs_Do_Return ( tstate, f ); 
+		PyFrameObject * fb = _BradDs_Do_Return ( tstate, f ); 
 
 		/*	As a first approximation, I think thats it.
 		*/
