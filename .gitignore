@@ -118,3 +118,4 @@ gmon.out
 *stderr.txt
 *stdout.txt
 printenv-out.txt
+*.wasm
