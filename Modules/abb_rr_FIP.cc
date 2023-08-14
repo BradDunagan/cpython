@@ -71,6 +71,8 @@ void	CDGenRobot01::Get_Cb_Tb ( const CM4 &				Ps,
 	//	the system origin then the gripper will be pointing down with
 	//	the opening in the system's Z axis.
 	//
+	Print (  3, sW, "GripOrgId: %d\n", pR->GripOrgId );
+
 	if ( pR->GripOrgId )
 	{
 		DiA0 & A0 = pR->GripOrgA0;	//	2009-Jan-28
@@ -176,6 +178,11 @@ int		CDGenRobot01::FIP_MoveTo_Setup (	   int iJ1, int nJ, bool & b180Adj,
 	//
 	Cb.GetXYZRPY_TPR ( CPx, CPy, CPz, CAx, CAy, CAz );
 
+	Print (  3, sW, "Cb: %7.2f %7.2f %7.2f  %7.2f %7.2f %7.2f",
+					CPx, CPy, CPz, CAx * PI2DEG,
+								   CAy * PI2DEG,
+								   CAz * PI2DEG );
+
 	//	Anything close -180 degress ...  make +180 so, for example, if
 	//	CAx is -180 and TAx is 90 the difference will be 90 (after changing
 	//	CAx to +180) instead of 270.
@@ -184,6 +191,7 @@ int		CDGenRobot01::FIP_MoveTo_Setup (	   int iJ1, int nJ, bool & b180Adj,
 	if ( fabs ( fabs ( CAy ) - PI ) < 0.00000001 )  CAy = PI;
 	if ( fabs ( fabs ( CAz ) - PI ) < 0.00000001 )  CAz = PI;
 
+	Print (  3, sW, "Cb: fixed -\n" );
 	Print (  3, sW, "Cb: %7.2f %7.2f %7.2f  %7.2f %7.2f %7.2f",
 					CPx, CPy, CPz, CAx * PI2DEG,
 								   CAy * PI2DEG,
