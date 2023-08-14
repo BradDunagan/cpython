@@ -5167,6 +5167,18 @@ main_loop:
                     }
                 }
             }
+			if ( BDDictCB) {		//	bradds
+				if ( BDDictCB ( LOAD_GLOBAL, f->f_globals, name, &v ) ) {
+					PyErr_Format(PyExc_SystemError,
+								 "failed dict cb when loading %R", name);
+					goto error; } 
+				//	Need to callback to the app to get the record?
+				if ( f->bradds_f_flags & BRADDS_F_FLAGS_PE_CALL ) {
+					stack_pointer = bradds_start_stack_pointer;
+					Py_DECREF(v);
+					retval = Py_None;
+					Py_INCREF(retval);
+					NO_STACK_RETURN(); } }
             PUSH(v);
             DISPATCH();
         }

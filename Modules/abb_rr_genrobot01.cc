@@ -152,7 +152,7 @@ void	CDGenRobot01::Print (		int		Level,
 {
 	if ( ! bDiagsOn )  return;
 
-	if ( Level < DL )  return;
+//	if ( Level < DL )  return;
 
 	va_list		alist;
 
@@ -346,7 +346,11 @@ int		CDGenRobot01::MovRbtTo ( PECB * 	pCB,
 
 			pPath->nS = 0;
 
-			pPath->B.GetRT ( pB6 );
+		//	pPath->B.GetRT ( pB6 );
+			pPath->B.SetRT ( pB6 );
+
+			printf ( "%s: pPath->B  x: %8.2f  y: %8.2f  z: %8.2f \n", sW,
+					 pPath->B.GetX(), pPath->B.GetY(), pPath->B.GetZ() );
 
 		//	pPath->nB = ~pW->GetS ( pR->BaseId );
 			pPath->nB = ~pPath->B;
@@ -356,6 +360,8 @@ int		CDGenRobot01::MovRbtTo ( PECB * 	pCB,
 			if ( pPath )  delete pPath;
 
 			pPath = 0;
+
+			printf ( "%s: no path\n", sW );
 		}
 
 		GetIKJoints ( pR, iJk0, iJkL );
@@ -363,6 +369,8 @@ int		CDGenRobot01::MovRbtTo ( PECB * 	pCB,
 		GetJoints2 ( pR, iJk0, iJkL - iJk0 + 1, JCur );
 
 
+		double	CPx, CPy, CPz, CAx, CAy, CAz;
+		
 		//	Motion Planning
 		//
 		//		If the target is ~180 deg around the base-link1 axis
@@ -374,7 +382,24 @@ int		CDGenRobot01::MovRbtTo ( PECB * 	pCB,
 	//	CM4	Cb, Tb;		CM4	Ls;	Ls.GetRT ( pL6 );
 		CM4	Cb, Tb;		CM4	Ls = GetLastLinkS ( pR );
 		
+		Ls.GetXYZRPY_TPR ( CPx, CPy, CPz, CAx, CAy, CAz );
+
+		Print (  3, sW, "Ls: %7.2f %7.2f %7.2f  %7.2f %7.2f %7.2f",
+						CPx, CPy, CPz, CAx * PI2DEG,
+									   CAy * PI2DEG,
+									   CAz * PI2DEG );
+
 		Get_Cb_Tb ( *pPs, Ls, pR, Cb, Tb );
+
+		Cb.GetXYZRPY_TPR ( CPx, CPy, CPz, CAx, CAy, CAz );
+
+		Print (  3, sW, "Cb: %7.2f %7.2f %7.2f  %7.2f %7.2f %7.2f",
+						CPx, CPy, CPz, CAx * PI2DEG,
+									   CAy * PI2DEG,
+									   CAz * PI2DEG );
+
+		printf ( "%s: Tb x: %8.2f  y: %8.2f  z: %8.2f\n", sW,
+				  Tb.GetX(), Tb.GetY(), Tb.GetZ() );
 
 		CM4	ITb[MAX_ITb];	int i, nITb = 0;		//	Intermediate targets.
 
@@ -1004,11 +1029,16 @@ int		CDGenRobot01::GetMovePath ( PECB *				pCB,
 */
 void	CDGenRobot01::ZeroEverything()
 {
+	const char * sW = "CDGenRobot01::ZeroEverything()";
+
 	pRD = 0;
 
 	pPath = 0;
 
-	bDiagsOn = TRUE;		DL = D4;			StepCnt = 0;
+//	bDiagsOn = TRUE;		DL = D4;			StepCnt = 0;
+	bDiagsOn = FALSE;		DL = D4;			StepCnt = 0;
+
+	printf ( "%s:  bDiagsOn %d  DL %d\n", sW, bDiagsOn, DL );
 
 	IKFunc = ::InvKin;
 
@@ -1505,7 +1535,10 @@ CM4		CDGenRobot01::GetLastLinkS ( SRGenRobot01_vXX * pR )
 							 pR->Alpha[iJ] );
 
 		if ( iJ == iJk0 ) {
-			Ps = A;
+			if ( pPath ) {
+				Ps = pPath->B * A; }
+			else {
+				Ps = A; }
 			continue; }
 
 		Ps = Ps * A;

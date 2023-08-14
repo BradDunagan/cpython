@@ -166,6 +166,13 @@ int		MovTo ( PECB * pCB, P6 * 	pB6, 	//	Base WRT system
 
 //	strcpy ( ErrStr, "no error" );
 
+	//	Base WRT system.
+	P6	Bs;		Bs.Px = pB6->Px;	Bs.Py = pB6->Py;	Bs.Pz = pB6->Pz;
+				Bs.Ax = pB6->Ax * DEG2PI;
+				Bs.Ay = pB6->Ay * DEG2PI;
+				Bs.Az = pB6->Az * DEG2PI;
+
+	//	Target WRT system.
 	CM4	P ( pPs->Px, pPs->Py, pPs->Pz, pPs->Ax * DEG2PI, 
 									   pPs->Ay * DEG2PI, 
 		 							   pPs->Az * DEG2PI );
@@ -173,7 +180,8 @@ int		MovTo ( PECB * pCB, P6 * 	pB6, 	//	Base WRT system
 	//	Check for LAR_ return.
 	//
 //	ENo = pD->MovRbtTo ( pCB, pB6, pL6, &P, Rtn );
-	ENo = pD->MovRbtTo ( pCB, pB6,      &P, Rtn );
+//	ENo = pD->MovRbtTo ( pCB, pB6,      &P, Rtn );
+	ENo = pD->MovRbtTo ( pCB, &Bs,      &P, Rtn );
 
 	if ( ENo && ((ENo & LAR_NOT_AN_ENO) == 0) )
 	{
