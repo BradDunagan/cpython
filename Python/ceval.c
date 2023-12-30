@@ -530,6 +530,26 @@ PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals)
                       NULL, NULL);
 }
 
+static _BradDs_EvalCodeCB _BradDs_import_name_cb = NULL;
+
+PyObject *
+_BradDs_PyEval_EvalCode ( PyObject * co, PyObject * globals, PyObject * locals,
+						  _BradDs_EvalCodeCB cb )
+{
+	_BradDs_import_name_cb = cb;
+
+	PyObject *	rtn = PyEval_EvalCodeEx ( co,
+                      					  globals, locals, 
+										  (PyObject **)NULL, 0, 
+										  (PyObject **)NULL, 0, 
+										  (PyObject **)NULL, 0,
+										  NULL, NULL );
+	_BradDs_import_name_cb = NULL;
+
+	return rtn;
+}
+
+
 
 /* Interpreter main loop */
 
@@ -7954,6 +7974,11 @@ import_name(PyFrameObject *f, PyObject *name, PyObject *fromlist, PyObject *leve
     _Py_IDENTIFIER(__import__);
     PyObject *import_func, *res;
     PyObject* stack[5];
+	
+	if ( _BradDs_import_name_cb ) {
+		_BradDs_import_name_cb ( name );
+
+	}
 
     import_func = _PyDict_GetItemId(f->f_builtins, &PyId___import__);
     if (import_func == NULL) {

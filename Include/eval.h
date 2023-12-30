@@ -9,6 +9,14 @@ extern "C" {
 
 PyAPI_FUNC(PyObject *) PyEval_EvalCode(PyObject *, PyObject *, PyObject *);
 
+typedef int	(* _BradDs_EvalCodeCB) ( PyObject * mod_name );
+
+PyAPI_FUNC(PyObject *) _BradDs_PyEval_EvalCode ( PyObject *, 
+												 PyObject *, 
+												 PyObject *,
+												 _BradDs_EvalCodeCB );
+
+
 PyAPI_FUNC(PyObject *) PyEval_EvalCodeEx(PyObject *co,
                                          PyObject *globals,
                                          PyObject *locals,

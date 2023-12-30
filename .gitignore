@@ -115,7 +115,7 @@ Tools/ssl/win32
 .vscode/
 gmon.out
 
-*stderr.txt
-*stdout.txt
+*stderr*.txt
+*stdout*.txt
 printenv-out.txt
 *.wasm
