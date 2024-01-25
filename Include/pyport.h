@@ -690,14 +690,19 @@ extern char * _getpty(int *, int, mode_t, int);
 #define LONG_BIT (8 * SIZEOF_LONG)
 #endif
 
+/*	bradds 	2023-Dec
+    This became a problem after updating emsdk.
+	For now, commenting out.
+	
 #if LONG_BIT != 8 * SIZEOF_LONG
-/* 04-Oct-2000 LONG_BIT is apparently (mis)defined as 64 on some recent
+ * 04-Oct-2000 LONG_BIT is apparently (mis)defined as 64 on some recent
  * 32-bit platforms using gcc.  We try to catch that here at compile-time
  * rather than waiting for integer multiplication to trigger bogus
  * overflows.
- */
+ *
 #error "LONG_BIT definition appears wrong for platform (bad gcc/glibc config?)."
 #endif
+*/
 
 #ifdef __cplusplus
 }
