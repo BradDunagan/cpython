@@ -366,6 +366,8 @@ CanvasContext_fillStyle ( CanvasContext * self, PyObject * args )
 										  PyUnicode_DATA ( self->canvas ),
 										  self->hContext,
 										  style );
+	UICBInProgress = 1;
+
 	Py_DECREF(uSelf);
 
 	return o;
@@ -413,6 +415,8 @@ CanvasContext_fillRect ( CanvasContext * self, PyObject * args )
 				PyUnicode_DATA ( self->canvas ),
 				self->hContext,
 				x, y, w, h );
+
+	UICBInProgress = 1;
 
 	Py_DECREF(uSelf);
 
@@ -530,7 +534,16 @@ PyDoc_STRVAR(setCanvasContextHandle_doc,
 
 static PyObject *	setCanvasContextHandle ( PyObject * self, PyObject * args ) {
 
+	const char * sW = "setCanvasContextHandle()";
+
 	const char * sCC;	int handle;
+
+	if ( ! UICBInProgress ) {
+		Error ( "%s: expeted UICBInProgress", sW );
+		return NULL; }
+
+	UICBInProgress = 0;
+
 	if ( ! PyArg_ParseTuple ( args, "si:setCanvasContextHandle", &sCC, &handle ) )
 		return NULL;
 
