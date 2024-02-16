@@ -268,65 +268,127 @@ CtxCallPart2 ( const char * fnc, PyObject * response )
 
 }	//	CtxCallPart2()
 
+static PyObject *	
+CanvasContext_size ( CanvasContext * self, PyObject * args ) 
+{
+	if ( UICBInProgress ) {
+		UICBInProgress = 0;
+
+		//	Part 2.  Get the app response from the callback.
+		//
+		PyObject * o = UICB ( 0, NULL );
+
+		PyObject * r = CtxCallPart2 ( "size", o ); 
+
+		Py_DECREF(o);	o = NULL;
+
+		return r; }
+
+	//	Part 1.
+	//
+	int w, h;
+
+	if ( ! PyArg_ParseTuple ( args, "ii:size", &w, &h) ) {
+		return NULL; }
+
+	PyObject * uSelf = PyUnicode_FromFormat ( "%llu", 
+											  (unsigned long long)self );
+	PyObject * o;
+	o = UICB ( BRADDS_F_FLAGS_UI_CALL,
+			   "[ { \"cmd\": \"canvas-size\", "
+				  " \"context-object\": \"%s\", "
+				  " \"pane\": \"%s\", "
+				  " \"panel\": \"%s\", "
+				  " \"canvas\": \"%s\", "
+				  " \"context-handle\": %d, "
+				  " \"w\": %d, \"h\": %d  } ]", 
+				PyUnicode_DATA ( uSelf ),
+				PyUnicode_DATA ( self->pane ),
+				PyUnicode_DATA ( self->panel ),
+				PyUnicode_DATA ( self->canvas ),
+				self->hContext,
+				w, h );
+
+	UICBInProgress = 1;
+
+	Py_DECREF(uSelf);
+
+	return o;
+
+}	//	CanvasContext_size()
+
+
+static PyObject *	
+CanvasContext_enlarge ( CanvasContext * self, PyObject * args ) 
+{
+	//	Large pixels, with borders.
+	//
+	//	size:		w, h of pixels
+	//				always odd, >= 3  - so there is always a center
+	//	border:		on / off
+	//				always 1 (actual pixel) wide/high.
+	//
+	//	Always a border? - easier, fewer options - more better
+	//
+	//	Enlarge all pixels of the current canvas. So, may want to call
+	//	size before this.
+
+	if ( UICBInProgress ) {
+		UICBInProgress = 0;
+
+		//	Part 2.  Get the app response from the callback.
+		//
+		PyObject * o = UICB ( 0, NULL );
+
+		PyObject * r = CtxCallPart2 ( "size", o ); 
+
+		Py_DECREF(o);	o = NULL;
+
+		return r; }
+
+	//	Part 1.
+	//
+	int pixelSize;
+
+	if ( ! PyArg_ParseTuple ( args, "i:enlarge", &pixelSize ) ) {
+		return NULL; }
+
+	PyObject * uSelf = PyUnicode_FromFormat ( "%llu", 
+											  (unsigned long long)self );
+	PyObject * o;
+	o = UICB ( BRADDS_F_FLAGS_UI_CALL,
+			   "[ { \"cmd\": \"canvas-enlarge\", "
+				  " \"context-object\": \"%s\", "
+				  " \"pane\": \"%s\", "
+				  " \"panel\": \"%s\", "
+				  " \"canvas\": \"%s\", "
+				  " \"context-handle\": %d, "
+				  " \"pixel-size\": %d  } ]", 
+				PyUnicode_DATA ( uSelf ),
+				PyUnicode_DATA ( self->pane ),
+				PyUnicode_DATA ( self->panel ),
+				PyUnicode_DATA ( self->canvas ),
+				self->hContext,
+				pixelSize );
+
+	UICBInProgress = 1;
+
+	Py_DECREF(uSelf);
+
+	return o;
+
+}	//	CanvasContext_enlarge()
+
+
 static PyObject *
 CanvasContext_fillStyle ( CanvasContext * self, PyObject * args )
 {
 	if ( UICBInProgress ) {
 		UICBInProgress = 0;
 
-	//	if ( UICBResult == NULL ) {
-	//		PyErr_SetString ( UIError, "fillstyle: no result" );
-	//		return NULL; }
-
 		//	Part 2.  Get the app response from the callback.
 		PyObject * o = UICB ( 0, NULL );
 
-	//	if ( o == NULL ) {
-	//		PyErr_SetString ( UIError, "fillstyle: no result" );
-	//		return NULL; }
-	//
-	//	if ( ! PyList_Check ( o ) ) {
-	//		PyErr_SetString ( UIError, "fillstyle: result is not a list" );
-	//		return NULL; }
-	//
-	//	int n = PySequence_Length ( o );
-	//
-	//	if ( n != 1 ) {
-	//		PyErr_SetString ( UIError, "fillstyle: expected 1 dict in result "
-	//								   "list" );
-	//		return NULL; }
-	//
-	//	PyObject * d = PySequence_GetItem ( o, 0 );
-	//
-	//	if ( ! PyDict_Check ( d ) ) {
-	//		PyErr_SetString ( UIError, "fillstyle: expected dict item in result "
-	//								   "list" );
-	//		return NULL; }
-	//
-	//	//	From whence status, result?
-	//	//	-	UICB result, a PyObject *.
-	//	//	-	Gotten from the second UICB(), just above.
-	//	//	-	Which itself is gotten by/from utils.c:ParseValue().
-	//	//	-	It is the response from the app. I.e., one of the dicts
-	//	//		in the array of responses.
-	//	//	-	So, here, we use a PyDict_... API call to get the status
-	//	//		and result items.
-	//
-	//	PyObject *	status = PyDict_GetItemString ( d, "status" );
-	//	PyObject *	result = PyDict_GetItemString ( d, "result" );
-	//
-	//	if ( strcmp ( status, "ok" )  == 0 ) {
-	//		//	result may be any PyObject *.
-	//		Py_INCREF(result);
-	//		Py_DECREF(o);	o = NULL;
-	//		return result; }
-	//
-	//	//	If status != "error" then result should always be a string (i.e., 
-	//	//	an error message).
-	//
-	//	PyErr_SetObject ( UIError, result );
-	//	Py_DECREF(o);	o = NULL;
-	//	return NULL; }
 		PyObject * r = CtxCallPart2 ( "fillStyle", o ); 
 
 		Py_DECREF(o);	o = NULL;
@@ -392,7 +454,6 @@ CanvasContext_fillRect ( CanvasContext * self, PyObject * args )
 
 	//	Part 1.
 	//
-
 	int x, y, w, h;
 
 	if ( ! PyArg_ParseTuple ( args, "iiii:fillRect", &x, &y, &w, &h) ) {
@@ -427,52 +488,159 @@ CanvasContext_fillRect ( CanvasContext * self, PyObject * args )
 static PyObject *
 CanvasContext_translate ( CanvasContext * self, PyObject * args )
 {
-	Error ( "%s: implement this", "translate" );
-
 	//	Part 2.
+	if ( UICBInProgress ) {
+		UICBInProgress = 0;
 
+		PyObject * o = UICB ( 0, NULL );
+
+		PyObject * r = CtxCallPart2 ( "translate", o ); 
+
+		Py_DECREF(o);	o = NULL;
+
+		return r; }
 
 	//	Part 1.
+	int x, y;
 
+	if ( ! PyArg_ParseTuple ( args, "ii:translate", &x, &y ) ) {
+		return NULL; }
+
+	PyObject * uSelf = PyUnicode_FromFormat ( "%llu", 
+											  (unsigned long long)self );
+	PyObject * o;
+	o = UICB ( BRADDS_F_FLAGS_UI_CALL,
+			   "[ { \"cmd\": \"canvas-translate\", "
+				  " \"context-object\": \"%s\", "
+				  " \"pane\": \"%s\", "
+				  " \"panel\": \"%s\", "
+				  " \"canvas\": \"%s\", "
+				  " \"context-handle\": %d, "
+				  " \"x\": %d, \"y\": %d } ]", 
+				PyUnicode_DATA ( uSelf ),
+				PyUnicode_DATA ( self->pane ),
+				PyUnicode_DATA ( self->panel ),
+				PyUnicode_DATA ( self->canvas ),
+				self->hContext,
+				x, y );
+
+	UICBInProgress = 1;
+
+	Py_DECREF(uSelf);
+
+	return o;
 
 }	//	CanvasContext_translate()
 
 static PyObject *
 CanvasContext_rotate ( CanvasContext * self, PyObject * args )
 {
-	Error ( "%s: implement this", "rotate" );
-
 	//	Part 2.
+	if ( UICBInProgress ) {
+		UICBInProgress = 0;
 
+		PyObject * o = UICB ( 0, NULL );
+
+		PyObject * r = CtxCallPart2 ( "rotate", o ); 
+
+		Py_DECREF(o);	o = NULL;
+
+		return r; }
 
 	//	Part 1.
+	double a;
 
+	if ( ! PyArg_ParseTuple ( args, "d:rotate", &a ) ) {
+		return NULL; }
+
+	PyObject * uSelf = PyUnicode_FromFormat ( "%llu", 
+											  (unsigned long long)self );
+	PyObject * o;
+	o = UICB ( BRADDS_F_FLAGS_UI_CALL,
+			   "[ { \"cmd\": \"canvas-rotate\", "
+				  " \"context-object\": \"%s\", "
+				  " \"pane\": \"%s\", "
+				  " \"panel\": \"%s\", "
+				  " \"canvas\": \"%s\", "
+				  " \"context-handle\": %d, "
+				  " \"a\": %f } ]", 
+				PyUnicode_DATA ( uSelf ),
+				PyUnicode_DATA ( self->pane ),
+				PyUnicode_DATA ( self->panel ),
+				PyUnicode_DATA ( self->canvas ),
+				self->hContext,
+				a );
+
+	UICBInProgress = 1;
+
+	Py_DECREF(uSelf);
+
+	return o;
 
 }	//	CanvasContext_rotate()
 
 static PyObject *
 CanvasContext_getImageData ( CanvasContext * self, PyObject * args )
 {
-	Error ( "%s: implement this", "getImageData" );
-
 	//	Part 2.
+	if ( UICBInProgress ) {
+		UICBInProgress = 0;
 
+		PyObject * o = UICB ( 0, NULL );
+
+		PyObject * r = CtxCallPart2 ( "getImageData", o ); 
+
+		Py_DECREF(o);	o = NULL;
+
+		return r; }
 
 	//	Part 1.
+	int x, y, w, h;
+
+	if ( ! PyArg_ParseTuple ( args, "iiii:getImageData", &x, &y, &w, &h ) ) {
+		return NULL; }
+
+	PyObject * uSelf = PyUnicode_FromFormat ( "%llu", 
+											  (unsigned long long)self );
+	PyObject * o;
+	o = UICB ( BRADDS_F_FLAGS_UI_CALL,
+			   "[ { \"cmd\": \"canvas-get-image-data\", "
+				  " \"context-object\": \"%s\", "
+				  " \"pane\": \"%s\", "
+				  " \"panel\": \"%s\", "
+				  " \"canvas\": \"%s\", "
+				  " \"context-handle\": %d, "
+				  " \"x\": %d, \"y\": %d, \"w\": %d, \"h\": %d } ]", 
+				PyUnicode_DATA ( uSelf ),
+				PyUnicode_DATA ( self->pane ),
+				PyUnicode_DATA ( self->panel ),
+				PyUnicode_DATA ( self->canvas ),
+				self->hContext,
+				x, y, w, h );
+
+	UICBInProgress = 1;
+
+	Py_DECREF(uSelf);
+
+	return o;
 
 
 }	//	CanvasContext_getImageData()
 
 static PyMethodDef CanvasContext_methods[] = {
-    { "fillStyle",		(PyCFunction)CanvasContext_fillStyle,		METH_VARARGS,
+	{ "size",			(PyCFunction)CanvasContext_size,		METH_VARARGS, 
+	  "Set canvas width, height." },
+    { "enlarge",		(PyCFunction)CanvasContext_enlarge,		METH_VARARGS,
+      "Elarge each pixel size."},
+    { "fillStyle",		(PyCFunction)CanvasContext_fillStyle,	METH_VARARGS,
       "Set the fill stiyle for a canvas." },
-    { "fillRect",		(PyCFunction)CanvasContext_fillRect,		METH_VARARGS,
+    { "fillRect",		(PyCFunction)CanvasContext_fillRect,	METH_VARARGS,
       "Fill a rectangle with the current fill style." },
-    { "translate",		(PyCFunction)CanvasContext_translate,		METH_VARARGS,
+    { "translate",		(PyCFunction)CanvasContext_translate,	METH_VARARGS,
       "Translate." },
-    { "rotate",			(PyCFunction)CanvasContext_rotate,			METH_VARARGS,
+    { "rotate",			(PyCFunction)CanvasContext_rotate,		METH_VARARGS,
       "Rotate." },
-    { "getImageData",	(PyCFunction)CanvasContext_getImageData,	METH_VARARGS,
+    { "getImageData",	(PyCFunction)CanvasContext_getImageData, METH_VARARGS,
       "Get image data." },
     { NULL }  /* Sentinel */
 };
