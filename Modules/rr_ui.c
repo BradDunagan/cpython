@@ -68,6 +68,10 @@ static UICBToAppFunc	UICB = NULL;
 
 static int				UICBInProgress = 0;
 
+static PyObject *		binascii = NULL;
+
+static PyObject *		a2bFn = NULL;
+
 /*
 static PyObject *		UICBResult = NULL;
 */
@@ -579,20 +583,62 @@ CanvasContext_rotate ( CanvasContext * self, PyObject * args )
 
 }	//	CanvasContext_rotate()
 
+
 static PyObject *
 CanvasContext_getImageData ( CanvasContext * self, PyObject * args )
 {
+	const char *	sWfnc = "getImageData";
+
 	//	Part 2.
 	if ( UICBInProgress ) {
 		UICBInProgress = 0;
 
 		PyObject * o = UICB ( 0, NULL );
 
-		PyObject * r = CtxCallPart2 ( "getImageData", o ); 
+		PyObject * r = CtxCallPart2 ( sWfnc, o ); 
 
 		Py_DECREF(o);	o = NULL;
 
-		return r; }
+		//	Result (i.e., r) should be a bas64 string representing the image
+		//	pixel data in bytes (i.e., one gray scale byte per pixel).
+		//	Convert the base64 string to a byte array for the result given
+		//	to the command record.
+		if ( binascii == NULL ) {
+			binascii = PyImport_ImportModule ( "binascii" );
+			if ( binascii == NULL ) {
+				Error ( "%s: failed to import module binascii", sWfnc);
+				return NULL; } 
+			a2bFn = PyObject_GetAttrString ( binascii, "a2b_base64" );
+			if ( a2bFn == NULL ) {
+				Py_DECREF(binascii);	binascii = NULL;
+				Error ( "%s: failed to get binascii function a2b_base64",
+						sWfnc );
+				return NULL; } }
+		PyObject* posArgs = PyTuple_New ( 1 ) ;
+		if ( ! PyTuple_Check ( posArgs ) ) {
+			Error ( "%s: failed to create arts tuple\n", sWfnc );
+			return NULL; }
+		Py_INCREF(r);
+		int		rc = PyTuple_SetItem ( posArgs, 0, r );
+		if ( rc ) {
+			Error ( "%s: failed to set args item", sWfnc );
+			Py_DECREF(posArgs);
+			return NULL; }
+		//	bytes
+		PyObject *	b = PyObject_Call ( a2bFn , posArgs, NULL ) ;
+		Py_DECREF(posArgs);
+		if ( ! PyBytes_Check ( b ) ) {
+			Error ( "%s: failed to get bytes\n", sWfnc );
+			return NULL; }
+		//	bytearray from bytes
+		PyObject *	ba  = PyByteArray_FromObject ( b );
+		Py_DECREF(b);
+		if ( ! PyByteArray_Check ( ba ) ) {
+			Error ( "%s: failed to get a byte array\n", sWfnc );
+			return NULL; }
+
+	//	return r; }
+		return ba; }
 
 	//	Part 1.
 	int x, y, w, h;
@@ -624,8 +670,56 @@ CanvasContext_getImageData ( CanvasContext * self, PyObject * args )
 
 	return o;
 
-
 }	//	CanvasContext_getImageData()
+
+
+static PyObject *
+CanvasContext_edge ( CanvasContext * self, PyObject * args )
+{
+	//	Part 2.
+	if ( UICBInProgress ) {
+		UICBInProgress = 0;
+
+		PyObject * o = UICB ( 0, NULL );
+
+		PyObject * r = CtxCallPart2 ( "edge", o ); 
+
+		Py_DECREF(o);	o = NULL;
+
+		return r; }
+
+	//	Part 1.
+//	double a;
+//
+//	if ( ! PyArg_ParseTuple ( args, "d:edge", &a ) ) {
+//		return NULL; }
+
+	PyObject * uSelf = PyUnicode_FromFormat ( "%llu", 
+											  (unsigned long long)self );
+	PyObject * o;
+	o = UICB ( BRADDS_F_FLAGS_UI_CALL,
+			   "[ { \"cmd\": \"canvas-edge\", "
+				  " \"context-object\": \"%s\", "
+				  " \"pane\": \"%s\", "
+				  " \"panel\": \"%s\", "
+				  " \"canvas\": \"%s\", "
+				  " \"context-handle\": %d } ] ",
+//				  " \"a\": %f } ]", 
+				PyUnicode_DATA ( uSelf ),
+				PyUnicode_DATA ( self->pane ),
+				PyUnicode_DATA ( self->panel ),
+				PyUnicode_DATA ( self->canvas ),
+				self->hContext );
+//				a );
+
+	UICBInProgress = 1;
+
+	Py_DECREF(uSelf);
+
+	return o;
+
+}	//	CanvasContext_edge()
+
 
 static PyMethodDef CanvasContext_methods[] = {
 	{ "size",			(PyCFunction)CanvasContext_size,		METH_VARARGS, 
@@ -642,7 +736,9 @@ static PyMethodDef CanvasContext_methods[] = {
       "Rotate." },
     { "getImageData",	(PyCFunction)CanvasContext_getImageData, METH_VARARGS,
       "Get image data." },
-    { NULL }  /* Sentinel */
+    { "edge",			(PyCFunction)CanvasContext_edge,		METH_VARARGS,
+      "Find edge features." },
+     { NULL }  /* Sentinel */
 };
 
 static PyTypeObject CanvasContextType = {

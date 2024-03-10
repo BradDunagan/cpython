@@ -4051,6 +4051,14 @@ main_loop:
                                      PyTuple_GetItem(co->co_varnames, oparg));
                 goto error;
             }
+			if ( BDDictCB ) {		//	bradds
+				//	To keep track of locals loaded and their members.
+            	PyObject *name = GETITEM(names, oparg);
+                PyObject *v    = PyDict_GetItem ( locals, name );
+				if ( BDDictCB ( LOAD_FAST, f->f_locals, name, &v ) ) {
+					PyErr_Format(PyExc_SystemError,
+								 "failed dict cb when loading %R", name);
+					goto error; } }
             Py_INCREF(value);
             PUSH(value);
             FAST_DISPATCH();
