@@ -3596,6 +3596,8 @@ _BradDs_PyEval_EvalFrameDefault ( PyFrameObject *f, int throwflag,
 													int * instr_ub,
 													int * instr_prev ) 
 {
+	const char * sW = "_BradDs_PyEval_EvalFrameDefault()";
+
     PyObject **stack_pointer;  /* Next free slot in value stack */
     const _Py_CODEUNIT *next_instr;
     int opcode;        /* Current opcode */
@@ -4053,11 +4055,9 @@ main_loop:
             }
 			if ( BDDictCB ) {		//	bradds
 				//	To keep track of locals loaded and their members.
-            	PyObject *name = GETITEM(names, oparg);
-                PyObject *v    = PyDict_GetItem ( locals, name );
-				if ( BDDictCB ( LOAD_FAST, f->f_locals, name, &v ) ) {
+				if ( BDDictCB ( LOAD_FAST, value, 0, 0 ) ) {
 					PyErr_Format(PyExc_SystemError,
-								 "failed dict cb when loading %R", name);
+								 "failed dict cb on LOAD_FAST");
 					goto error; } }
             Py_INCREF(value);
             PUSH(value);
