@@ -57,16 +57,19 @@ Notes on building (i.e., compiling, etc.) -
 
 #include	"rr_ui.h"
 
+#include	"rr_ui_panel.h"
+
+
+UICBToAppFunc	UIAppCB = NULL;
+
+int				UICBInProgress = 0;
+
+PyObject *		UIError = NULL;
+
 
 //	Going by -
 //
 //		https://docs.python.org/3.7/extending/newtypes_tutorial.html
-
-static PyObject *		UIError = NULL;
-
-static UICBToAppFunc	UICB = NULL;
-
-static int				UICBInProgress = 0;
 
 static PyObject *		binascii = NULL;
 
@@ -165,7 +168,7 @@ CanvasContext_init ( CanvasContext * self, PyObject * args, PyObject * kwds )
 
 	//	Callback to the app to get the context handle.
 	//
-	if ( UICB == NULL ) {
+	if ( UIAppCB == NULL ) {
 		PyErr_SetString ( UIError, "App rr_ui callback is not set." );
 		return -1; }
 	UICBInProgress = 1;
@@ -173,14 +176,14 @@ CanvasContext_init ( CanvasContext * self, PyObject * args, PyObject * kwds )
 	PyObject * uSelf = PyUnicode_FromFormat ( "%llu", 
 											  (unsigned long long)self );
 	PyObject * o;
-//	o = UICB ( BRADDS_F_FLAGS_UI_CALL,
+//	o = UIAppCB ( BRADDS_F_FLAGS_UI_CALL,
 //	//	Do not specify BRADDS_F_FLAGS_UI_CALL because we don't need/want to 
 	//	execute the statement again.
 	//	But we do need to have the app provide a canvas context.  How?
 	//		-	Finish the statement, but, in the response to the app some
 	//			command or status to get and provide the canvas context before 
 	//			executing the next statement.
-	o = UICB ( 0,						//	don't execute the statement again
+	o = UIAppCB ( 0,					//	don't execute the statement again
 			   "[ { \"cmd\": \"get-canvas-context\", "
 				  " \"context-object\": \"%s\", "
 				  " \"pane\": \"%s\", "
@@ -199,8 +202,8 @@ CanvasContext_init ( CanvasContext * self, PyObject * args, PyObject * kwds )
 }	//	CanvasContext_init()
 
 
-static void
-Error ( const char * fmt, ... )
+void
+UIErr ( const char * fmt, ... )
 {
 	char buf [128];		buf[sizeof(buf) - 1] = '\0';
 
@@ -210,34 +213,34 @@ Error ( const char * fmt, ... )
 
 	PyErr_SetString ( UIError, buf );
 
-}	//	Error()
+}	//	UIErr()
 
-static PyObject *
-CtxCallPart2 ( const char * fnc, PyObject * response )
+PyObject *
+AppCallPart2 ( const char * fnc, PyObject * response )
 {
 	if ( response == NULL ) {
-		Error ( "%s: no result", fnc );
+		UIErr ( "%s: no result", fnc );
 		return NULL; }
 
 	if ( ! PyList_Check ( response ) ) {
-		Error ( "%s: result is not a list", fnc );
+		UIErr ( "%s: result is not a list", fnc );
 		return NULL; }
 
 	int n = PySequence_Length ( response );
 
 	if ( n != 1 ) {
-		Error ( "%s: expected 1 dict in result list", fnc ); 
+		UIErr ( "%s: expected 1 dict in result list", fnc ); 
 		return NULL; }
 
 	PyObject * d = PySequence_GetItem ( response, 0 );
 
 	if ( ! PyDict_Check ( d ) ) {
-		Error ( "%s: expected dict item in result list", fnc );
+		UIErr ( "%s: expected dict item in result list", fnc );
 		return NULL; }
 
 	//	From whence status, result?
-	//	-	UICB result, a PyObject *.
-	//	-	Gotten from the second UICB(), just above.
+	//	-	UIAppCB result, a PyObject *.
+	//	-	Gotten from the second UIAppCB(), just above.
 	//	-	Which itself is gotten by/from utils.c:ParseValue().
 	//	-	It is the response from the app. I.e., one of the dicts
 	//		in the array of responses.
@@ -248,11 +251,11 @@ CtxCallPart2 ( const char * fnc, PyObject * response )
 	PyObject *	resultO = PyDict_GetItemString ( d, "result" );
 
 	if ( PyUnicode_KIND ( statusO ) != PyUnicode_1BYTE_KIND ) {
-		Error ( "%s: expected status in dict item", fnc );
+		UIErr ( "%s: expected status in dict item", fnc );
 		return NULL; }
 
 	if ( ! resultO ) {
-		Error ( "%s: expect result object in dict item" );
+		UIErr ( "%s: expect result object in dict item", fnc );
 		return NULL; }
 
 	const char * status = PyUnicode_DATA ( statusO );
@@ -266,11 +269,11 @@ CtxCallPart2 ( const char * fnc, PyObject * response )
 	//	an error message).
 
 //	PyErr_SetObject ( UIError, result );
-	Error ( "%s: %s", fnc,  status );
+	UIErr ( "%s: %s", fnc,  status );
 
 	return NULL; 
 
-}	//	CtxCallPart2()
+}	//	AppCallPart2()
 
 static PyObject *	
 CanvasContext_size ( CanvasContext * self, PyObject * args ) 
@@ -280,9 +283,9 @@ CanvasContext_size ( CanvasContext * self, PyObject * args )
 
 		//	Part 2.  Get the app response from the callback.
 		//
-		PyObject * o = UICB ( 0, NULL );
+		PyObject * o = UIAppCB ( 0, NULL );
 
-		PyObject * r = CtxCallPart2 ( "size", o ); 
+		PyObject * r = AppCallPart2 ( "size", o ); 
 
 		Py_DECREF(o);	o = NULL;
 
@@ -298,7 +301,7 @@ CanvasContext_size ( CanvasContext * self, PyObject * args )
 	PyObject * uSelf = PyUnicode_FromFormat ( "%llu", 
 											  (unsigned long long)self );
 	PyObject * o;
-	o = UICB ( BRADDS_F_FLAGS_UI_CALL,
+	o = UIAppCB ( BRADDS_F_FLAGS_UI_CALL,
 			   "[ { \"cmd\": \"canvas-size\", "
 				  " \"context-object\": \"%s\", "
 				  " \"pane\": \"%s\", "
@@ -342,9 +345,9 @@ CanvasContext_enlarge ( CanvasContext * self, PyObject * args )
 
 		//	Part 2.  Get the app response from the callback.
 		//
-		PyObject * o = UICB ( 0, NULL );
+		PyObject * o = UIAppCB ( 0, NULL );
 
-		PyObject * r = CtxCallPart2 ( "size", o ); 
+		PyObject * r = AppCallPart2 ( "size", o ); 
 
 		Py_DECREF(o);	o = NULL;
 
@@ -360,7 +363,7 @@ CanvasContext_enlarge ( CanvasContext * self, PyObject * args )
 	PyObject * uSelf = PyUnicode_FromFormat ( "%llu", 
 											  (unsigned long long)self );
 	PyObject * o;
-	o = UICB ( BRADDS_F_FLAGS_UI_CALL,
+	o = UIAppCB ( BRADDS_F_FLAGS_UI_CALL,
 			   "[ { \"cmd\": \"canvas-enlarge\", "
 				  " \"context-object\": \"%s\", "
 				  " \"pane\": \"%s\", "
@@ -391,9 +394,9 @@ CanvasContext_fillStyle ( CanvasContext * self, PyObject * args )
 		UICBInProgress = 0;
 
 		//	Part 2.  Get the app response from the callback.
-		PyObject * o = UICB ( 0, NULL );
+		PyObject * o = UIAppCB ( 0, NULL );
 
-		PyObject * r = CtxCallPart2 ( "fillStyle", o ); 
+		PyObject * r = AppCallPart2 ( "fillStyle", o ); 
 
 		Py_DECREF(o);	o = NULL;
 
@@ -419,7 +422,7 @@ CanvasContext_fillStyle ( CanvasContext * self, PyObject * args )
 	PyObject * uSelf = PyUnicode_FromFormat ( "%llu", 
 											  (unsigned long long)self );
 	PyObject * o;
-	o = UICB ( BRADDS_F_FLAGS_UI_CALL,
+	o = UIAppCB ( BRADDS_F_FLAGS_UI_CALL,
 			   "[ { \"cmd\": \"canvas-set-fillstyle\", "
 				  " \"context-object\": \"%s\", "
 				  " \"pane\": \"%s\", "
@@ -448,9 +451,9 @@ CanvasContext_fillRect ( CanvasContext * self, PyObject * args )
 
 		//	Part 2.  Get the app response from the callback.
 		//
-		PyObject * o = UICB ( 0, NULL );
+		PyObject * o = UIAppCB ( 0, NULL );
 
-		PyObject * r = CtxCallPart2 ( "fillRect", o ); 
+		PyObject * r = AppCallPart2 ( "fillRect", o ); 
 
 		Py_DECREF(o);	o = NULL;
 
@@ -466,7 +469,7 @@ CanvasContext_fillRect ( CanvasContext * self, PyObject * args )
 	PyObject * uSelf = PyUnicode_FromFormat ( "%llu", 
 											  (unsigned long long)self );
 	PyObject * o;
-	o = UICB ( BRADDS_F_FLAGS_UI_CALL,
+	o = UIAppCB ( BRADDS_F_FLAGS_UI_CALL,
 			   "[ { \"cmd\": \"canvas-fill-rect\", "
 				  " \"context-object\": \"%s\", "
 				  " \"pane\": \"%s\", "
@@ -496,9 +499,9 @@ CanvasContext_translate ( CanvasContext * self, PyObject * args )
 	if ( UICBInProgress ) {
 		UICBInProgress = 0;
 
-		PyObject * o = UICB ( 0, NULL );
+		PyObject * o = UIAppCB ( 0, NULL );
 
-		PyObject * r = CtxCallPart2 ( "translate", o ); 
+		PyObject * r = AppCallPart2 ( "translate", o ); 
 
 		Py_DECREF(o);	o = NULL;
 
@@ -513,7 +516,7 @@ CanvasContext_translate ( CanvasContext * self, PyObject * args )
 	PyObject * uSelf = PyUnicode_FromFormat ( "%llu", 
 											  (unsigned long long)self );
 	PyObject * o;
-	o = UICB ( BRADDS_F_FLAGS_UI_CALL,
+	o = UIAppCB ( BRADDS_F_FLAGS_UI_CALL,
 			   "[ { \"cmd\": \"canvas-translate\", "
 				  " \"context-object\": \"%s\", "
 				  " \"pane\": \"%s\", "
@@ -543,9 +546,9 @@ CanvasContext_rotate ( CanvasContext * self, PyObject * args )
 	if ( UICBInProgress ) {
 		UICBInProgress = 0;
 
-		PyObject * o = UICB ( 0, NULL );
+		PyObject * o = UIAppCB ( 0, NULL );
 
-		PyObject * r = CtxCallPart2 ( "rotate", o ); 
+		PyObject * r = AppCallPart2 ( "rotate", o ); 
 
 		Py_DECREF(o);	o = NULL;
 
@@ -560,7 +563,7 @@ CanvasContext_rotate ( CanvasContext * self, PyObject * args )
 	PyObject * uSelf = PyUnicode_FromFormat ( "%llu", 
 											  (unsigned long long)self );
 	PyObject * o;
-	o = UICB ( BRADDS_F_FLAGS_UI_CALL,
+	o = UIAppCB ( BRADDS_F_FLAGS_UI_CALL,
 			   "[ { \"cmd\": \"canvas-rotate\", "
 				  " \"context-object\": \"%s\", "
 				  " \"pane\": \"%s\", "
@@ -593,9 +596,9 @@ CanvasContext_getImageData ( CanvasContext * self, PyObject * args )
 	if ( UICBInProgress ) {
 		UICBInProgress = 0;
 
-		PyObject * o = UICB ( 0, NULL );
+		PyObject * o = UIAppCB ( 0, NULL );
 
-		PyObject * r = CtxCallPart2 ( sWfnc, o ); 
+		PyObject * r = AppCallPart2 ( sWfnc, o ); 
 
 		Py_DECREF(o);	o = NULL;
 
@@ -606,35 +609,35 @@ CanvasContext_getImageData ( CanvasContext * self, PyObject * args )
 		if ( binascii == NULL ) {
 			binascii = PyImport_ImportModule ( "binascii" );
 			if ( binascii == NULL ) {
-				Error ( "%s: failed to import module binascii", sWfnc);
+				UIErr ( "%s: failed to import module binascii", sWfnc);
 				return NULL; } 
 			a2bFn = PyObject_GetAttrString ( binascii, "a2b_base64" );
 			if ( a2bFn == NULL ) {
 				Py_DECREF(binascii);	binascii = NULL;
-				Error ( "%s: failed to get binascii function a2b_base64",
+				UIErr ( "%s: failed to get binascii function a2b_base64",
 						sWfnc );
 				return NULL; } }
 		PyObject* posArgs = PyTuple_New ( 1 ) ;
 		if ( ! PyTuple_Check ( posArgs ) ) {
-			Error ( "%s: failed to create arts tuple\n", sWfnc );
+			UIErr ( "%s: failed to create arts tuple\n", sWfnc );
 			return NULL; }
 		Py_INCREF(r);
 		int		rc = PyTuple_SetItem ( posArgs, 0, r );
 		if ( rc ) {
-			Error ( "%s: failed to set args item", sWfnc );
+			UIErr ( "%s: failed to set args item", sWfnc );
 			Py_DECREF(posArgs);
 			return NULL; }
 		//	bytes
 		PyObject *	b = PyObject_Call ( a2bFn , posArgs, NULL ) ;
 		Py_DECREF(posArgs);
 		if ( ! PyBytes_Check ( b ) ) {
-			Error ( "%s: failed to get bytes\n", sWfnc );
+			UIErr ( "%s: failed to get bytes\n", sWfnc );
 			return NULL; }
 		//	bytearray from bytes
 		PyObject *	ba  = PyByteArray_FromObject ( b );
 		Py_DECREF(b);
 		if ( ! PyByteArray_Check ( ba ) ) {
-			Error ( "%s: failed to get a byte array\n", sWfnc );
+			UIErr ( "%s: failed to get a byte array\n", sWfnc );
 			return NULL; }
 
 	//	return r; }
@@ -649,7 +652,7 @@ CanvasContext_getImageData ( CanvasContext * self, PyObject * args )
 	PyObject * uSelf = PyUnicode_FromFormat ( "%llu", 
 											  (unsigned long long)self );
 	PyObject * o;
-	o = UICB ( BRADDS_F_FLAGS_UI_CALL,
+	o = UIAppCB ( BRADDS_F_FLAGS_UI_CALL,
 			   "[ { \"cmd\": \"canvas-get-image-data\", "
 				  " \"context-object\": \"%s\", "
 				  " \"pane\": \"%s\", "
@@ -680,9 +683,9 @@ CanvasContext_edge ( CanvasContext * self, PyObject * args )
 	if ( UICBInProgress ) {
 		UICBInProgress = 0;
 
-		PyObject * o = UICB ( 0, NULL );
+		PyObject * o = UIAppCB ( 0, NULL );
 
-		PyObject * r = CtxCallPart2 ( "edge", o ); 
+		PyObject * r = AppCallPart2 ( "edge", o ); 
 
 		Py_DECREF(o);	o = NULL;
 
@@ -697,7 +700,7 @@ CanvasContext_edge ( CanvasContext * self, PyObject * args )
 	PyObject * uSelf = PyUnicode_FromFormat ( "%llu", 
 											  (unsigned long long)self );
 	PyObject * o;
-	o = UICB ( BRADDS_F_FLAGS_UI_CALL,
+	o = UIAppCB ( BRADDS_F_FLAGS_UI_CALL,
 			   "[ { \"cmd\": \"canvas-edge\", "
 				  " \"context-object\": \"%s\", "
 				  " \"pane\": \"%s\", "
@@ -757,6 +760,30 @@ static PyTypeObject CanvasContextType = {
 };
 
 
+static PyMethodDef Panel_methods[] = {
+	{ "size",	(PyCFunction)Panel_size,	METH_VARARGS, 
+	  "Set panel width, height." },
+    { "load",	(PyCFunction)Panel_load,	METH_VARARGS | METH_KEYWORDS,
+      "Load panel with controls maintained in a record."},
+     { NULL }  /* Sentinel */
+};
+
+static PyTypeObject PanelType = {
+	PyVarObject_HEAD_INIT(NULL, 0)
+	.tp_name = "rr_ui.Panel",
+	.tp_doc = "Panel",
+	.tp_basicsize = sizeof(Panel),
+	.tp_itemsize = 0,
+	.tp_flags = Py_TPFLAGS_DEFAULT,
+	.tp_new = Panel_new,
+	.tp_init = (initproc) Panel_init,
+	.tp_dealloc = (destructor) Panel_dealloc,
+//	.tp_members = Custom_members,
+	.tp_methods = Panel_methods,
+//	.tp_getset  = Custom_getsetters,
+};
+
+
 
 
 
@@ -785,8 +812,8 @@ static PyObject *	setCallback ( PyObject * self, PyObject * args ) {
 	if ( ! PyArg_ParseTuple ( args, "s:setCallback", &cb ) )
 		return NULL;
 
-//	UICB = (UICBToAppFunc)cb;
-	UICB = (UICBToAppFunc)atoll ( cb );
+//	UIAppCB = (UICBToAppFunc)cb;
+	UIAppCB = (UICBToAppFunc)atoll ( cb );
 
     Py_INCREF(Py_None);
     return Py_None;
@@ -803,7 +830,7 @@ static PyObject *	setCanvasContextHandle ( PyObject * self, PyObject * args ) {
 	const char * sCC;	int handle;
 
 	if ( ! UICBInProgress ) {
-		Error ( "%s: expeted UICBInProgress", sW );
+		UIErr ( "%s: expeted UICBInProgress", sW );
 		return NULL; }
 
 	UICBInProgress = 0;
@@ -819,6 +846,9 @@ static PyObject *	setCanvasContextHandle ( PyObject * self, PyObject * args ) {
     return Py_None;
 
 }	//	setCanvasContextHandle()
+
+PyDoc_STRVAR(setPanelEleId_doc, 
+		"setPanelEleId()\n\nSet/keep the element ID of a panel.");
 
 
 /*
@@ -842,6 +872,8 @@ static PyMethodDef	rr_ui_Methods[] = {
 								METH_VARARGS, setCallback_doc },
 	{ "setCanvasContextHandle", setCanvasContextHandle, 
 								METH_VARARGS, setCanvasContextHandle_doc },
+	{ "setPanelEleId",			setPanelEleId, 
+								METH_VARARGS, setPanelEleId_doc },
 //	{ "setCallbackResult", 		setCallbackResult, 
 //								METH_VARARGS, setCallbackResult_doc },
 	{ NULL, NULL, 0, NULL } 
@@ -873,6 +905,9 @@ PyMODINIT_FUNC	PyInit_rr_ui ( void ) {
 	if ( PyType_Ready ( &CanvasContextType ) < 0 ) {
 		return NULL; }
 
+	if ( PyType_Ready ( &PanelType ) < 0 ) {
+		return NULL; }
+
 	PyObject *	m = PyModule_Create ( &rr_ui_Module );
 	if ( m == NULL ) {
 		return NULL; }
@@ -892,6 +927,13 @@ PyMODINIT_FUNC	PyInit_rr_ui ( void ) {
 	if (PyModule_AddObject ( m, "CanvasContext", 
 							 (PyObject *)&CanvasContextType ) < 0 ) {
 		Py_DECREF(&CanvasContextType);
+		Py_DECREF(m);
+		return NULL; }
+
+	Py_INCREF(&PanelType);
+	if (PyModule_AddObject ( m, "Panel", 
+							 (PyObject *)&PanelType ) < 0 ) {
+		Py_DECREF(&PanelType);
 		Py_DECREF(m);
 		return NULL; }
 
