@@ -55,7 +55,7 @@ Notes on building (i.e., compiling, etc.) -
 
 #include	<frameobject.h>			//	For BRADDS_F_FLAGS_UI_CALL.
 
-#include	"rr_ui.h"
+#include	"rr_ui_canvas.h"
 
 #include	"rr_ui_panel.h"
 
