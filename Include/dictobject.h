@@ -173,6 +173,18 @@ int _PyObjectDict_SetItem(PyTypeObject *tp, PyObject **dictptr, PyObject *name, 
 PyObject *_PyDict_LoadGlobal(PyDictObject *, PyDictObject *, PyObject *);
 #endif
 
+
+
+typedef int	(* _BradDs_DictOpCB) ( PyDictObject * dict, 
+								   int op, PyObject * key, PyObject * value );
+
+PyAPI_FUNC(int)	_BradDs_SetDictOpCB ( _BradDs_DictOpCB cb );
+
+
+#define	BRADD_DICT_OP_CHECK_ITEM		1
+#define	BRADD_DICT_OP_SET_ITEM			2
+
+
 #ifdef __cplusplus
 }
 #endif

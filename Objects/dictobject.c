@@ -1436,6 +1436,19 @@ _PyDict_LoadGlobal(PyDictObject *globals, PyDictObject *builtins, PyObject *key)
     return value;
 }
 
+/*	BradD -
+	To maintain (persist) global variables.
+*/
+static _BradDs_DictOpCB _BradDs_dict_op_cb = NULL;
+
+int
+_BradDs_SetDictOpCB ( _BradDs_DictOpCB cb )
+{
+	_BradDs_dict_op_cb = cb;
+
+	return 0;
+}
+
 /* CAUTION: PyDict_SetItem() must guarantee that it won't resize the
  * dictionary if it's merely replacing the value for an existing key.
  * This means that it's safe to loop over a dictionary with PyDict_Next()
@@ -1462,8 +1475,26 @@ PyDict_SetItem(PyObject *op, PyObject *key, PyObject *value)
             return -1;
     }
 
+	/*	BradD -	Check item. For global collections only certain types
+		of objects may be items. */
+	if ( _BradDs_dict_op_cb ) {
+		int r = _BradDs_dict_op_cb ( mp, BRADD_DICT_OP_CHECK_ITEM, 0, value );
+		if ( r == -1 ) {
+			return -1; } }
+
     /* insertdict() handles any resizing that might be necessary */
-    return insertdict(mp, key, hash, value);
+//  return insertdict(mp, key, hash, value);
+    int r = insertdict(mp, key, hash, value);
+	if ( r == -1 ) {
+		return -1; }
+
+	if ( _BradDs_dict_op_cb ) {
+		//	Is item a collection? Replacing existing item? Was previous
+		//	item a collection?
+		int r = _BradDs_dict_op_cb ( mp, BRADD_DICT_OP_SET_ITEM, key, value );
+		if ( r == -1 ) {
+			return -1; } }
+	return r;
 }
 
 int

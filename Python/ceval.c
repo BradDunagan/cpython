@@ -4568,8 +4568,16 @@ main_loop:
             PyObject *v = THIRD();
             int err;
             STACKADJ(-3);
-            /* container[sub] = v */
-            err = PyObject_SetItem(container, sub, v);
+
+		//	/* container[sub] = v */
+        //  err = PyObject_SetItem(container, sub, v);
+			if ( PyDict_CheckExact ( container ) ) {
+        		err = PyObject_SetItem(container, sub, v);
+				if ( (! err) && BDDictCB) {
+				   	err = BDDictCB ( STORE_SUBSCR, container, sub, &v ); } }
+            else
+        		err = PyObject_SetItem(container, sub, v);
+
             Py_DECREF(v);
             Py_DECREF(container);
             Py_DECREF(sub);
