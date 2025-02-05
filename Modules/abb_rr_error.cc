@@ -931,7 +931,10 @@ static void	Trace ( int Type, int ENo, const char * Func, const char * Text )
 #ifdef JS_WIN32
 	_snprintf_s ( Buffer1, sizeof(Buffer1), _TRUNCATE, &Func[iC] );
 #else
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wformat-security"
 	_snprintf ( Buffer1, sizeof(Buffer1) - 1, &Func[iC] );
+	#pragma GCC diagnostic pop
 #endif
 
 	Buffer1[sizeof(Buffer1) - 1] = '\0';

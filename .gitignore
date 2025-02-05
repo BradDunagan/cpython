@@ -119,3 +119,6 @@ gmon.out
 *stdout*.txt
 printenv-out.txt
 *.wasm
+
+python3.7
+a.out
