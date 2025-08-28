@@ -213,6 +213,19 @@ PyList_GetItem(PyObject *op, Py_ssize_t i)
     return ((PyListObject *)op) -> ob_item[i];
 }
 
+/*	BradD -
+	To maintain (persist) global variables.
+*/
+static _BradDs_ListOpCB _BradDs_list_op_cb = NULL;
+
+int
+_BradDs_SetListOpCB ( _BradDs_ListOpCB cb )
+{
+	_BradDs_list_op_cb = cb;
+
+	return 0;
+}
+
 int
 PyList_SetItem(PyObject *op, Py_ssize_t i,
                PyObject *newitem)
@@ -223,6 +236,15 @@ PyList_SetItem(PyObject *op, Py_ssize_t i,
         PyErr_BadInternalCall();
         return -1;
     }
+
+	/*	BradD -	Check item. For global collections only certain types
+		of objects may be items. */
+	if ( _BradDs_list_op_cb ) {
+        PyListObject *  mp = (PyListObject *)op;
+		int r = _BradDs_list_op_cb ( mp, BRADD_LIST_OP_CHECK_ITEM, 0, newitem );
+		if ( r == -1 ) {
+			return -1; } }
+
     if (i < 0 || i >= Py_SIZE(op)) {
         Py_XDECREF(newitem);
         PyErr_SetString(PyExc_IndexError,
@@ -231,6 +253,15 @@ PyList_SetItem(PyObject *op, Py_ssize_t i,
     }
     p = ((PyListObject *)op) -> ob_item + i;
     Py_XSETREF(*p, newitem);
+
+	if ( _BradDs_list_op_cb ) {
+		//	Is item a collection? Replacing existing item? Was previous
+		//	item a collection?
+        PyListObject *  mp = (PyListObject *)op;
+		int r = _BradDs_list_op_cb ( mp, BRADD_LIST_OP_SET_ITEM, i, newitem );
+		if ( r == -1 ) {
+			return -1; } }
+
     return 0;
 }
 

@@ -183,6 +183,7 @@ PyAPI_FUNC(int)	_BradDs_SetDictOpCB ( _BradDs_DictOpCB cb );
 
 #define	BRADD_DICT_OP_CHECK_ITEM		1
 #define	BRADD_DICT_OP_SET_ITEM			2
+#define	BRADD_DICT_OP_DEL_ITEM			3
 
 
 #ifdef __cplusplus

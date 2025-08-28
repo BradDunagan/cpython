@@ -75,6 +75,16 @@ PyAPI_FUNC(void) _PyList_DebugMallocStats(FILE *out);
 #define _PyList_ITEMS(op)      (((PyListObject *)(op))->ob_item)
 #endif
 
+
+typedef int	(* _BradDs_ListOpCB) ( PyListObject * list, 
+								   int op, Py_ssize_t i, PyObject * value );
+
+PyAPI_FUNC(int)	_BradDs_SetListOpCB ( _BradDs_ListOpCB cb );
+
+
+#define	BRADD_LIST_OP_CHECK_ITEM		1
+#define	BRADD_LIST_OP_SET_ITEM			2
+
 #ifdef __cplusplus
 }
 #endif

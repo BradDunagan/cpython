@@ -5342,7 +5342,12 @@ main_loop:
                 goto error;
             while (--oparg >= 0) {
                 PyObject *item = POP();
-                PyList_SET_ITEM(list, oparg, item);
+            //  PyList_SET_ITEM(list, oparg, item);
+                //  BradDs  For storable stuff.
+                int err = PyList_SetItem ( list, oparg, item );
+                if ( err != 0 ) {
+                    goto error;
+                }
             }
             PUSH(list);
             DISPATCH();
