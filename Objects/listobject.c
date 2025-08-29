@@ -249,8 +249,10 @@ PyList_SetItem(PyObject *op, Py_ssize_t i,
         Py_XDECREF(newitem);
         PyErr_SetString(PyExc_IndexError,
                         "list assignment index out of range");
-        return -1;
-    }
+        return -1; }
+
+//  #define PyList_SET_ITEM(op, i, v) (((PyListObject *)(op))->ob_item[i] = (v))
+//  Is that like? -
     p = ((PyListObject *)op) -> ob_item + i;
     Py_XSETREF(*p, newitem);
 
@@ -323,8 +325,30 @@ app1(PyListObject *self, PyObject *v)
     if (list_resize(self, n+1) < 0)
         return -1;
 
+	/*	BradD -	Check item. For global collections only certain types
+		of objects may be items. */
+	if ( _BradDs_list_op_cb ) {
+		int r = _BradDs_list_op_cb ( self, BRADD_LIST_OP_CHECK_ITEM, 0, v );
+		if ( r == -1 ) {
+			return -1; } }
+
     Py_INCREF(v);
     PyList_SET_ITEM(self, n, v);
+//    //  BradDs  For storable stuff.
+//	if ( _BradDs_list_op_cb ) {
+//      int err = PyList_SetItem ( self, n, v );
+//      if ( err != 0 ) {
+//         return err; } }
+//  else {
+//      PyList_SET_ITEM(self, n, v); }
+
+	if ( _BradDs_list_op_cb ) {
+		//	Is item a collection? Replacing existing item? Was previous
+		//	item a collection?
+		int r = _BradDs_list_op_cb ( self, BRADD_LIST_OP_SET_ITEM, n, v );
+		if ( r == -1 ) {
+			return -1; } }
+
     return 0;
 }
 
