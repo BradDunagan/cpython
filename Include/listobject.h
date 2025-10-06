@@ -82,8 +82,10 @@ typedef int	(* _BradDs_ListOpCB) ( PyListObject * list,
 PyAPI_FUNC(int)	_BradDs_SetListOpCB ( _BradDs_ListOpCB cb );
 
 
-#define	BRADD_LIST_OP_CHECK_ITEM		1
-#define	BRADD_LIST_OP_SET_ITEM			2
+#define	BRADD_LIST_OP_CHECK_ITEM        1
+#define	BRADD_LIST_OP_ADD_ITEM          2
+#define	BRADD_LIST_OP_DEL_ITEM          3
+#define	BRADD_LIST_OP_CHANGE_ITEM       4
 
 #ifdef __cplusplus
 }

@@ -1553,14 +1553,13 @@ PyDict_DelItem(PyObject *op, PyObject *key)
             return -1;
     }
 
-//	return _PyDict_DelItem_KnownHash(op, key, hash);
-    int r = _PyDict_DelItem_KnownHash(op, key, hash);
+    if ( _BradDs_dict_op_cb ) {
+	PyObject * value = PyDict_GetItem ( op, key );
+        int r = _BradDs_dict_op_cb ( op, BRADD_DICT_OP_DEL_ITEM, key, value );
+        if ( r == -1 ) {
+            return -1; } }
 	
-	if ( _BradDs_dict_op_cb ) {
-		int r = _BradDs_dict_op_cb ( op, BRADD_DICT_OP_DEL_ITEM, key, NULL );
-		if ( r == -1 ) {
-			return -1; } }
-    return r;
+    return _PyDict_DelItem_KnownHash(op, key, hash);
 }
 
 int

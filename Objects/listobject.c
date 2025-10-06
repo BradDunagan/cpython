@@ -256,13 +256,13 @@ PyList_SetItem(PyObject *op, Py_ssize_t i,
     p = ((PyListObject *)op) -> ob_item + i;
     Py_XSETREF(*p, newitem);
 
-	if ( _BradDs_list_op_cb ) {
-		//	Is item a collection? Replacing existing item? Was previous
-		//	item a collection?
+    if ( _BradDs_list_op_cb ) {
+        //	Is item a collection? Replacing existing item? Was previous
+        //	item a collection?
         PyListObject *  mp = (PyListObject *)op;
-		int r = _BradDs_list_op_cb ( mp, BRADD_LIST_OP_SET_ITEM, i, newitem );
-		if ( r == -1 ) {
-			return -1; } }
+        int r = _BradDs_list_op_cb ( mp, BRADD_LIST_OP_ADD_ITEM, i, newitem );
+        if ( r == -1 ) {
+            return -1; } }
 
     return 0;
 }
@@ -325,29 +325,22 @@ app1(PyListObject *self, PyObject *v)
     if (list_resize(self, n+1) < 0)
         return -1;
 
-	/*	BradD -	Check item. For global collections only certain types
-		of objects may be items. */
-	if ( _BradDs_list_op_cb ) {
-		int r = _BradDs_list_op_cb ( self, BRADD_LIST_OP_CHECK_ITEM, 0, v );
-		if ( r == -1 ) {
-			return -1; } }
+    /*  BradD -	Check item. For global collections only certain types
+        of objects may be items. */
+    if ( _BradDs_list_op_cb ) {
+        int r = _BradDs_list_op_cb ( self, BRADD_LIST_OP_CHECK_ITEM, 0, v );
+        if ( r == -1 ) {
+            return -1; } }
 
     Py_INCREF(v);
     PyList_SET_ITEM(self, n, v);
-//    //  BradDs  For storable stuff.
-//	if ( _BradDs_list_op_cb ) {
-//      int err = PyList_SetItem ( self, n, v );
-//      if ( err != 0 ) {
-//         return err; } }
-//  else {
-//      PyList_SET_ITEM(self, n, v); }
 
-	if ( _BradDs_list_op_cb ) {
-		//	Is item a collection? Replacing existing item? Was previous
-		//	item a collection?
-		int r = _BradDs_list_op_cb ( self, BRADD_LIST_OP_SET_ITEM, n, v );
-		if ( r == -1 ) {
-			return -1; } }
+    if ( _BradDs_list_op_cb ) {
+        //  Is item a collection? Replacing existing item? Was previous
+        //  item a collection?
+        int r = _BradDs_list_op_cb ( self, BRADD_LIST_OP_ADD_ITEM, n, v );
+        if ( r == -1 ) {
+            return -1; } }
 
     return 0;
 }
@@ -697,6 +690,14 @@ list_ass_slice(PyListObject *a, Py_ssize_t ilow, Py_ssize_t ihigh, PyObject *v)
     }
 
     if (d < 0) { /* Delete -d items */
+        if ( _BradDs_list_op_cb ) {
+            for ( Py_ssize_t i = ilow; i < ihigh; i++ ) {
+                int r = _BradDs_list_op_cb ( a, BRADD_LIST_OP_DEL_ITEM, i, item[i] );
+                if ( r == -1 ) {
+                    goto Error;
+                }
+            }
+        }
         Py_ssize_t tail;
         tail = (Py_SIZE(a) - ihigh) * sizeof(PyObject *);
         memmove(&item[ihigh+d], &item[ihigh], tail);
@@ -715,7 +716,7 @@ list_ass_slice(PyListObject *a, Py_ssize_t ilow, Py_ssize_t ihigh, PyObject *v)
         memmove(&item[ihigh+d], &item[ihigh],
             (k - ihigh)*sizeof(PyObject *));
     }
-    for (k = 0; k < n; k++, ilow++) {
+   for (k = 0; k < n; k++, ilow++) {
         PyObject *w = vitem[k];
         Py_XINCREF(w);
         item[ilow] = w;
@@ -790,6 +791,12 @@ list_ass_item(PyListObject *a, Py_ssize_t i, PyObject *v)
     }
     if (v == NULL)
         return list_ass_slice(a, i, i+1, v);
+
+    if ( _BradDs_list_op_cb ) {
+        int r = _BradDs_list_op_cb ( a, BRADD_LIST_OP_CHANGE_ITEM, i, v );
+        if ( r == -1 ) {
+            return -1; } }
+
     Py_INCREF(v);
     Py_SETREF(a->ob_item[i], v);
     return 0;
@@ -915,6 +922,13 @@ list_extend(PyListObject *self, PyObject *iterable)
             PyObject *o = src[i];
             Py_INCREF(o);
             dest[i] = o;
+	    if ( _BradDs_list_op_cb ) {
+		int r = _BradDs_list_op_cb ( self, BRADD_LIST_OP_ADD_ITEM, m + i, o );
+		if ( r == -1 ) {
+	            Py_DECREF(iterable);
+		    return NULL;
+	        }
+            }
         }
         Py_DECREF(iterable);
         Py_RETURN_NONE;
